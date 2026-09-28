@@ -1,0 +1,10 @@
+#!/bin/sh
+# Strip Cursor / Co-authored trailers before the editor / -m path finalizes the message.
+MSG_FILE="$1"
+[ -f "$MSG_FILE" ] || exit 0
+sed -i \
+  -e '/^Co-authored-by:/Id' \
+  -e '/^Signed-off-by: Cursor /Id' \
+  -e '/^Signed-off-by: Cursor Agent /Id' \
+  -e '/^Made-with: Cursor/Id' \
+  "$MSG_FILE"

@@ -1,0 +1,8 @@
+#!/bin/sh
+# ArqTras-only authorship: strip every Co-authored-by / Cursor Signed-off-by trailer.
+sed -i \
+  -e '/^Co-authored-by:/Id' \
+  -e '/^Signed-off-by: Cursor /Id' \
+  -e '/^Signed-off-by: Cursor Agent /Id' \
+  -e '/^Made-with: Cursor/Id' \
+  "$1"
