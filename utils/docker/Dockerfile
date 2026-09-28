@@ -119,7 +119,7 @@ RUN pwd && mem_avail_gb=$(( $(getconf _AVPHYS_PAGES) * $(getconf PAGE_SIZE) / (1
     make_job_slots=$(( $mem_avail_gb < 4 ? 1 : $mem_avail_gb / 4)) &&\
     echo make_job_slots=$make_job_slots &&\
     set -x &&\
-    git clone --single-branch --recursive https://github.com/ArqTras/pdc.git &&\
+    git clone --single-branch --recursive https://github.com/PrivacyDataCoin-Project/PDC.git &&\
     cd pdc &&\
     mkdir build && cd build &&\
     cmake -D STATIC=TRUE .. &&\

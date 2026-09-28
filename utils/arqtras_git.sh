@@ -49,20 +49,20 @@ case "$cmd" in
     tag="${1:?tag required}"
     notes="${2:-}"
     if [[ -n "$notes" ]]; then
-      GH_TOKEN="$TOKEN" gh release create "$tag" --repo ArqTras/pdc --title "PDC $tag" --notes-file "$notes"
+      GH_TOKEN="$TOKEN" gh release create "$tag" --repo PrivacyDataCoin-Project/PDC --title "PDC $tag" --notes-file "$notes"
     else
-      GH_TOKEN="$TOKEN" gh release create "$tag" --repo ArqTras/pdc --title "PDC $tag" --generate-notes
+      GH_TOKEN="$TOKEN" gh release create "$tag" --repo PrivacyDataCoin-Project/PDC --title "PDC $tag" --generate-notes
     fi
     ;;
   release-recreate)
     require_token
     tag="${1:?tag required}"
     notes="${2:-}"
-    GH_TOKEN="$TOKEN" gh release delete "$tag" --repo ArqTras/pdc --yes 2>/dev/null || true
+    GH_TOKEN="$TOKEN" gh release delete "$tag" --repo PrivacyDataCoin-Project/PDC --yes 2>/dev/null || true
     if [[ -n "$notes" ]]; then
-      GH_TOKEN="$TOKEN" gh release create "$tag" --repo ArqTras/pdc --title "PDC $tag" --notes-file "$notes"
+      GH_TOKEN="$TOKEN" gh release create "$tag" --repo PrivacyDataCoin-Project/PDC --title "PDC $tag" --notes-file "$notes"
     else
-      GH_TOKEN="$TOKEN" gh release create "$tag" --repo ArqTras/pdc --title "PDC $tag" --generate-notes
+      GH_TOKEN="$TOKEN" gh release create "$tag" --repo PrivacyDataCoin-Project/PDC --title "PDC $tag" --generate-notes
     fi
     ;;
   check-token)

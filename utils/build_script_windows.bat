@@ -190,7 +190,7 @@ IF %ERRORLEVEL% NEQ 0 (
 )
 call :sha256 %build_zip_path% build_zip_checksum
 
-set mail_msg="New %build_prefix% %TESTNET_LABEL%build for win-x64:<br>INST: <a href='https://github.com/ArqTras/pdc/releases'>%installer_file%</a> <br>sha256: %installer_checksum%<br><br>ZIP:  <a href='https://github.com/ArqTras/pdc/releases'>%build_zip_filename%</a> <br>sha256: %build_zip_checksum%<br>"
+set mail_msg="New %build_prefix% %TESTNET_LABEL%build for win-x64:<br>INST: <a href='https://github.com/PrivacyDataCoin-Project/PDC/releases'>%installer_file%</a> <br>sha256: %installer_checksum%<br><br>ZIP:  <a href='https://github.com/PrivacyDataCoin-Project/PDC/releases'>%build_zip_filename%</a> <br>sha256: %build_zip_checksum%<br>"
 
 echo %mail_msg%
 

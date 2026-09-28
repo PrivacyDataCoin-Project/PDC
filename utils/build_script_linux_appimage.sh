@@ -149,7 +149,7 @@ fi
 read checksum <<< $(sha256sum $package_filename | awk '/^/ { print $1 }' )
 
 mail_msg="New ${build_prefix_label}${testnet_label}${copy_qt_dev_tools_label}build for linux-x64:<br>
-<a href='https://github.com/ArqTras/pdc/releases'>$package_filename</a><br>
+<a href='https://github.com/PrivacyDataCoin-Project/PDC/releases'>$package_filename</a><br>
 sha256: $checksum"
 
 echo "$mail_msg"

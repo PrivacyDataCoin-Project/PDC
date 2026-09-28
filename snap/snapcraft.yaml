@@ -6,7 +6,7 @@ description: |
   PDC is a scalable and secure coin, designed for use in e-commerce.
   The technology behind our blockchain provides reliability, security,
   and flexibility a perfect option for P2P transactions.
-  More info: https://github.com/ArqTras/pdc
+  More info: https://github.com/PrivacyDataCoin-Project/PDC
 grade: stable
 confinement: strict
 
@@ -16,7 +16,7 @@ architectures:
 
 parts:
   pdc:
-    source: https://github.com/ArqTras/pdc.git
+    source: https://github.com/PrivacyDataCoin-Project/PDC.git
     plugin: cmake
     override-pull: |
         snapcraftctl pull

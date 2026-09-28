@@ -1,7 +1,7 @@
 ## Cloning
 
 Be sure to clone the repository properly:\
-`$ git clone --recursive https://github.com/ArqTras/pdc.git`
+`$ git clone --recursive https://github.com/PrivacyDataCoin-Project/PDC.git`
 
 # Building
 --------
@@ -40,9 +40,9 @@ Recommended OS versions: Ubuntu 20.04, 22.04 LTS.
        sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git screen checkinstall zlib1g-dev mesa-common-dev libglu1-mesa-dev
 
 2. Clone PDC into a local folder\
-   (If for some reason you need to use alternative PDC branch, change 'pdc' to the required branch name.)
+   (The default branch is master. To use another branch, add `-b` and the branch name.)
    
-       git clone --recursive https://github.com/ArqTras/pdc.git -b pdc
+       git clone --recursive https://github.com/PrivacyDataCoin-Project/PDC.git
 
    In the following steps we assume that you cloned PDC into '~/pdc' folder in your home directory. 
 
