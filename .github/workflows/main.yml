@@ -191,7 +191,7 @@ jobs:
           rm -rf /home/runner/work/_temp/
           wget https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
           chmod 777 linuxdeployqt-continuous-x86_64.AppImage
-          /home/runner/work/PDC/pdc/build/src/linuxdeployqt-continuous-x86_64.AppImage ./Pdc-GUI-${TAG}/usr/share/applications/Pdc.desktop -qmake=/home/runner/work/PDC/Qt/5.12.12/gcc_64/bin/qmake
+          /home/runner/work/PDC/PDC/build/src/linuxdeployqt-continuous-x86_64.AppImage ./Pdc-GUI-${TAG}/usr/share/applications/Pdc.desktop -qmake=/home/runner/work/PDC/Qt/5.12.12/gcc_64/bin/qmake
           wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod 777 appimagetool-x86_64.AppImage
           rm -rf Pdc-GUI-${TAG}/AppRun
@@ -201,7 +201,7 @@ jobs:
           chmod 777 Pdc-GUI-${TAG}/*/*/*
           chmod 777 Pdc-GUI-${TAG}/*/*/*/*
           chmod 777 Pdc-GUI-${TAG}/*/*/*/*/*
-          ARCH=x86_64 /home/runner/work/PDC/pdc/build/src/appimagetool-x86_64.AppImage ./Pdc-GUI-${TAG} Pdc-GUI-${TAG}-${LABEL}.AppImage
+          ARCH=x86_64 /home/runner/work/PDC/PDC/build/src/appimagetool-x86_64.AppImage ./Pdc-GUI-${TAG} Pdc-GUI-${TAG}-${LABEL}.AppImage
           chmod a+x Pdc-GUI-${TAG}-${LABEL}.AppImage
           # Tag pushes name packages with the tag; copy to sha names for artifact upload.
           # Branch pushes already use sha names — skip same-file cp (GNU cp errors).
