@@ -19,7 +19,4 @@
 	url = https://github.com/PrivacyDataCoin-Project/pdc_ui
 [submodule "contrib/randomx"]
 	path = contrib/randomx
-	url = https://github.com/arqma/RandomARQ.git
-[submodule "contrib/RandomARQ"]
-	path = contrib/RandomARQ
 	url = https://github.com/PrivacyDataCoin-Project/RandomARQ.git
