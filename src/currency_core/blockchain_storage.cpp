@@ -493,24 +493,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     LOG_PRINT_MAGENTA("Storage initialized with genesis", LOG_LEVEL_0);
   }
 
-  // Emergency HF7 cut-off (Zano inflation-bug response): restart from block 1200.
-  // KEEP blocks [0 .. HF7_AFTER_HEIGHT] (top height 1199); next mined block is 1200 under HF7.
-  {
-    const uint64_t hf7_after = m_core_runtime_config.hard_forks.get_height_the_hardfork_active_after(ZANO_HARDFORK_07);
-    const uint64_t truncate_to_size = hf7_after + 1; // size == top_height + 1 == 1200 when after==1199
-    if (m_db_blocks.size() > truncate_to_size)
-    {
-      LOG_PRINT_RED_L0("Emergency HF7 gateway cut-off: truncating blockchain from height "
-        << (m_db_blocks.size() - 1) << " down to " << hf7_after
-        << " so the next block is " << truncate_to_size << " under the post-fix fork");
-      m_is_irreverseble_prunning_on = true;
-      {
-        auto a = epee::misc_utils::create_scope_leave_handler([&]() { m_is_irreverseble_prunning_on = false; });
-        truncate_blockchain(truncate_to_size);
-      }
-      LOG_PRINT_GREEN("Blockchain truncated for HF7; top height is now " << (m_db_blocks.size() - 1), LOG_LEVEL_0);
-    }
-  }
+  // HF7 stays active from block 1200. Do not rewind a synced chain on startup.
 
   store_db_solo_options_values();
 
