@@ -6,6 +6,10 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: write
+  actions: read
+
 env:
   TAG: ${{ github.ref }}
 
