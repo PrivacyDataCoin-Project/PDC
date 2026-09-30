@@ -351,8 +351,9 @@ jobs:
           # during macdeployqt; we sign inside-out afterwards.
           "$MACDEPLOYQT" Pdc.app -always-overwrite -no-codesign || true
 
-          # Homebrew Qt leaves QtWebEngineProcess on absolute keg paths; rewrite
-          # them to @rpath before codesign or the UI stays blank on user Macs.
+          # Rewrite Homebrew absolute paths and macdeployqt's
+          # @executable_path/../Frameworks dylib loads. The latter resolves
+          # inside QtWebEngineProcess and dyld aborts the helper (blank UI).
           chmod +x ../../utils/macos_fix_qt_webengine_rpaths.sh
           ../../utils/macos_fix_qt_webengine_rpaths.sh Pdc.app
 
@@ -382,6 +383,13 @@ jobs:
               exit 1
             fi
           done
+          QTCORE="$(find Pdc.app/Contents/Frameworks/QtCore.framework -type f -name QtCore | head -1)"
+          test -n "$QTCORE"
+          if otool -L "$QTCORE" | grep -q '@executable_path/../Frameworks/lib'; then
+            echo "ERROR: QtCore still loads dylibs via @executable_path; QtWebEngineProcess will not start"
+            otool -L "$QTCORE"
+            exit 1
+          fi
 
           rm -rf "Pdc-Gui-${TAG}"
           mkdir "Pdc-Gui-${TAG}"

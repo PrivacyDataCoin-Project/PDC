@@ -90,10 +90,15 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Fix Homebrew-style absolute Qt linkage on QtWebEngineProcess when present.
+# Fix Homebrew absolute paths and @executable_path dylib loads so
+# QtWebEngineProcess can start on machines without Homebrew Qt.
 if [ -x ../../../utils/macos_fix_qt_webengine_rpaths.sh ]; then
   chmod +x ../../../utils/macos_fix_qt_webengine_rpaths.sh
-  ../../../utils/macos_fix_qt_webengine_rpaths.sh ./Pdc.app || true
+  ../../../utils/macos_fix_qt_webengine_rpaths.sh ./Pdc.app
+  if [ $? -ne 0 ]; then
+    echo "Failed to fix Qt WebEngine library paths"
+    exit 1
+  fi
 fi
 
 rm -rf Pdc.app/Contents/Frameworks/libboost*.dylib
