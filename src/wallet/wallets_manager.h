@@ -74,6 +74,9 @@ public:
     std::atomic<bool> has_related_alias_in_unconfirmed;
     std::atomic<bool> need_to_update_wallet_info;
     std::atomic<bool> long_refresh_in_progress;
+    // Set from the UI thread. The worker drops history and scans from genesis
+    // so an in-flight refresh cannot mark the wallet synced after the reset.
+    std::atomic<bool> resync_requested{false};
     epee::critical_section long_refresh_in_progress_lock; //secure wallet state and prevent from long wait while long refresh is in work
 
     view::i_view* pview;

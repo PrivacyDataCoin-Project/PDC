@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy · PDC Wallet</title>
+  <meta name="description" content="Privacy policy for the PDC Wallet iOS app and the Privacy Data Coin website.">
+  <link rel="canonical" href="https://privacydatacoin.com/privacy.html">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="brand/pdc-mark.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Montserrat:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/site.css?v=20261001a">
+</head>
+<body>
+  <canvas class="rain" aria-hidden="true"></canvas>
+  <a class="skip" href="#main">Skip to content</a>
+  <button class="menu-btn" type="button" data-menu aria-controls="sidebar" aria-expanded="false">Menu</button>
+  <div class="backdrop" data-backdrop hidden></div>
+  <aside class="sidebar" id="sidebar">
+    <a class="brand" href="index.html">
+      <img class="brand-mark" src="brand/pdc-mark.png" width="42" height="42" alt="">
+      <span><strong>PDC</strong><small>Privacy Data Coin</small></span>
+    </a>
+    <nav class="side-nav" aria-label="Sections">
+        <a href="features.html">Protocol</a>
+        <a href="network.html">Network</a>
+        <a href="download.html">Download</a>
+        <a href="privacy.html" aria-current="page">Privacy</a>
+        <a href="https://github.com/PrivacyDataCoin-Project/PDC" target="_blank" rel="noreferrer">Source</a>
+    </nav>
+    <div class="lang" role="group" aria-label="Language">
+      <button type="button" data-lang="en">EN</button>
+      <button type="button" data-lang="pl">PL</button>
+    </div>
+  </aside>
+
+  <main id="main">
+    <div class="wrap page-hero">
+      <p class="kicker">PDC Wallet</p>
+      <h1>Privacy policy</h1>
+      <p class="lede">This policy covers the PDC Wallet app for iOS and this website. Effective 1 October 2026.</p>
+    </div>
+    <section class="wrap">
+      <article class="card">
+        <h3>What stays on the device</h3>
+        <p>The wallet file, seed phrase, private keys, and transaction history are stored on the iPhone. PDC Wallet does not upload them to an account of ours. There is no sign-in server and no analytics SDK.</p>
+        <p>If you turn on Face ID, the wallet password is stored in the iOS Keychain so the system can unlock the wallet. You can turn that off in the app, which removes the Keychain item.</p>
+      </article>
+      <article class="card">
+        <h3>Remote node</h3>
+        <p>The app syncs with a PDC node you choose. The default is a public node. That connection uses the node’s address, so the node sees your IP address, the blocks your wallet requests, and any transaction you broadcast. The view key is not sent to the node for a normal scan. The node operator can keep ordinary connection logs. We do not use that traffic to build an advertising profile.</p>
+      </article>
+      <article class="card">
+        <h3>Camera and photos</h3>
+        <p>The camera is used only when you scan a QR code. The photo library is used only when you pick a backup or QR image, or when you choose to save an image. Those files are not uploaded by the app.</p>
+      </article>
+      <article class="card">
+        <h3>Website</h3>
+        <p>privacydatacoin.com is a static site. It does not set an account cookie and does not run third-party advertising. The host may keep standard server logs (IP address, page, time) for security.</p>
+      </article>
+      <article class="card">
+        <h3>Children</h3>
+        <p>PDC Wallet is not directed at children under 13.</p>
+      </article>
+      <article class="card">
+        <h3>Contact</h3>
+        <p>Questions about this policy: use the contact path published on <a href="https://privacydatacoin.com/">privacydatacoin.com</a> or the project repository at github.com/PrivacyDataCoin-Project/PDC.</p>
+      </article>
+    </section>
+  </main>
+  <footer class="wrap site-footer">
+    <span>Privacy Data Coin. PDC Wallet privacy policy.</span>
+    <span><a href="index.html">Home</a></span>
+  </footer>
+  <script src="js/rain.js?v=20260926c"></script>
+  <script src="js/site.js?v=20260926c"></script>
+</body>
+</html>

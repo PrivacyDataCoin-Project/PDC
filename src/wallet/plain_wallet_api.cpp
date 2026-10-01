@@ -194,10 +194,8 @@ namespace plain_wallet
     auto local_ptr = std::atomic_load(&ginstance_ptr);
     if (local_ptr)
     {
-      LOG_ERROR("Double-initialization in plain_wallet detected.");
-      epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
-      ok_response.result.return_code = API_RETURN_CODE_ALREADY_EXISTS;
-      return epee::serialization::store_t_to_json(ok_response);
+      LOG_PRINT_L0("Replacing an existing plain_wallet instance.");
+      deinit();
     }
 
     epee::static_helpers::set_or_call_on_destruct(true, static_destroy_handler);
@@ -752,6 +750,11 @@ namespace plain_wallet
   {
     GET_INSTANCE_PTR(inst_ptr);
     return inst_ptr->gwm.reset_wallet_password(h, password);
+  }
+  std::string resync_wallet(hwallet h)
+  {
+    GET_INSTANCE_PTR(inst_ptr);
+    return inst_ptr->gwm.resync_wallet(h);
   }
 
 

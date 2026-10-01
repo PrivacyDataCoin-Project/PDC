@@ -1822,6 +1822,8 @@ namespace currency
     x.is_service = currency::is_service_tx(x.tx);
     x.is_mixing = currency::does_tx_have_only_mixin_inputs(x.tx);
     x.is_mining = currency::is_coinbase(x.tx);
+    // PoW coinbase has only txin_gen. PoS coinbase also spends the stake (txin_to_key / txin_zc_input).
+    x.is_pos = x.is_mining && currency::is_pos_miner_tx(x.tx);
     if (!x.is_mining)
       x.fee = currency::get_tx_fee(x.tx);
     else

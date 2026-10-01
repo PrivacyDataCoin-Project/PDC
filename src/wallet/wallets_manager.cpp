@@ -804,6 +804,21 @@ bool wallets_manager::update_state_info()
   get_last_blocks(dsi);
   m_last_daemon_network_state = dsi.daemon_network_state;
   m_last_daemon_height = dsi.height = inf.height;
+  // Remote daemons that only have inbound peers report daemon_network_state_connecting
+  // forever (outgoing_connections_count==0). Wallet sync must still run when getinfo
+  // succeeds and a real tip height is known — otherwise local height stays frozen.
+  if (m_remote_node_mode && m_last_daemon_height > 1 &&
+      (m_last_daemon_network_state == currency::COMMAND_RPC_GET_INFO::daemon_network_state_connecting ||
+       m_last_daemon_network_state == currency::COMMAND_RPC_GET_INFO::daemon_network_state_synchronizing))
+  {
+    LOG_PRINT_L0("[REMOTE_NODE] Treating daemon_network_state "
+      << m_last_daemon_network_state << " as online for wallet sync (height="
+      << m_last_daemon_height << ", in=" << inf.incoming_connections_count
+      << ", out=" << inf.outgoing_connections_count
+      << ", sync_peers=" << inf.synchronized_connections_count << ")");
+    m_last_daemon_network_state = currency::COMMAND_RPC_GET_INFO::daemon_network_state_online;
+    dsi.daemon_network_state = m_last_daemon_network_state;
+  }
   m_pview->update_daemon_status(dsi);
   return true;
 }
@@ -1893,8 +1908,11 @@ std::string wallets_manager::is_wallet_password_valid(uint64_t wallet_id, const 
 std::string wallets_manager::resync_wallet(uint64_t wallet_id)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, w);
-  w.w->get()->reset_history();
+  // Do not reset on this thread: refresh() holds the wallet lock, and the
+  // worker then stores the daemon tip into last_wallet_synch_height, which
+  // skips the scan and leaves the UI at height 0.
   w.last_wallet_synch_height = 0;
+  w.resync_requested.store(true);
   return API_RETURN_CODE_OK;
 }
 std::string wallets_manager::start_pos_mining(uint64_t wallet_id)
@@ -2206,6 +2224,13 @@ void wallets_manager::wallet_vs_options::worker_func()
     stop_for_refresh = false;
     try
     {
+      if (resync_requested.exchange(false))
+      {
+        LOG_PRINT_L0("[WALLET_HANDLER] full rescan: reset history, scan from genesis");
+        w->get()->reset_history();
+        w->get()->set_minimum_height(0);
+        last_wallet_synch_height = 0;
+      }
       wsi.wallet_state = view::wallet_status_info::wallet_state_ready;
       if (m_pproxy_diagnostig_info->last_daemon_is_disconnected.load())
       {
@@ -2250,8 +2275,11 @@ void wallets_manager::wallet_vs_options::worker_func()
           wallet_state = wsi.wallet_state = view::wallet_status_info::wallet_state_ready;
           prepare_wallet_status_info(*this, wsi);
           pview->update_wallet_status(wsi);
-          //do refresh
-          last_wallet_synch_height = static_cast<uint64_t>(*plast_daemon_height);
+          // A rescan requested during this refresh must not be marked synced.
+          if (resync_requested.load())
+            last_wallet_synch_height = 0;
+          else
+            last_wallet_synch_height = static_cast<uint64_t>(*plast_daemon_height);
         }
 
         scan_pool_interval.do_call([&](){
