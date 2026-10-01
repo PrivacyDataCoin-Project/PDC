@@ -5,17 +5,28 @@ out_dir=~/.local/share/applications
 out_file_name="${out_dir}/Pdc.desktop"
 
 export QTWEBENGINE_DISABLE_SANDBOX=1
+export QTWEBENGINE_CHROMIUM_FLAGS="${QTWEBENGINE_CHROMIUM_FLAGS:---disable-gpu --no-sandbox}"
+# Prefer libraries shipped inside the AppImage over host OpenSSL 3.
+if [ -d "$script_dir/usr/lib" ]; then
+  export LD_LIBRARY_PATH="$script_dir/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
+if [ -x "$script_dir/usr/bin/QtWebEngineProcess" ]; then
+  export QTWEBENGINEPROCESS_PATH="$script_dir/usr/bin/QtWebEngineProcess"
+elif [ -x "$script_dir/QtWebEngineProcess" ]; then
+  export QTWEBENGINEPROCESS_PATH="$script_dir/QtWebEngineProcess"
+fi
 
 call_app()
 {
-  pushd $script_dir
+  pushd "$script_dir" >/dev/null
   usr/bin/Pdc "$@"
-  if [ $? -ne 0 ]; then
+  status=$?
+  if [ $status -ne 0 ]; then
     echo $'\n\n\x1b[1mIf Pdc fails to launch, it might need to install xinerama extension for the X C Binding with this command:\n\x1b[2m   sudo apt-get install libxcb-xinerama0\n\n'
   fi
 
-  popd
-  exit
+  popd >/dev/null
+  exit $status
 }
 
 

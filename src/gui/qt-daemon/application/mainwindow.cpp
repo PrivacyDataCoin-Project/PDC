@@ -556,13 +556,18 @@ void MainWindow::init_tray_icon(const std::string& html_path)
 
 
   m_restore_action = std::unique_ptr<QAction>(new QAction(tr("&Restore"), this));
-  connect(m_restore_action.get(), SIGNAL(triggered()), this, SLOT(on_menu_show()));
+  // QAction::triggered has no QString; HTML bridge slots take QString — use lambdas.
+  connect(m_restore_action.get(), &QAction::triggered, this, [this](bool) {
+    on_menu_show(QString());
+  });
 
   m_quit_action = std::unique_ptr<QAction>(new QAction(tr("&Quit"), this));
-  connect(m_quit_action.get(), SIGNAL(triggered()), this, SLOT(tray_quit_requested()));
+  connect(m_quit_action.get(), &QAction::triggered, this, [this](bool) {
+    tray_quit_requested(QString());
+  });
 
   m_minimize_action = std::unique_ptr<QAction>(new QAction(tr("minimizeAction"), this));
-  connect(m_minimize_action.get(), SIGNAL(triggered()), this, SLOT(showMinimized()));
+  connect(m_minimize_action.get(), &QAction::triggered, this, &QWidget::showMinimized);
 
   m_tray_icon_menu = std::unique_ptr<QMenu>(new QMenu(this));
   m_tray_icon_menu->addAction(m_minimize_action.get());

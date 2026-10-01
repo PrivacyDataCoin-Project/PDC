@@ -94,20 +94,32 @@ cp $QT_PREFIX_PATH/lib/libQt5WebEngineWidgets.so.5 ./Pdc/lib
 cp $QT_PREFIX_PATH/lib/libQt5WebChannel.so.5 ./Pdc/lib
 cp $QT_PREFIX_PATH/lib/libQt5XcbQpa.so.5 ./Pdc/lib
 cp $QT_PREFIX_PATH/lib/libQt5QuickWidgets.so.5 ./Pdc/lib
+# Prefer build-tree OpenSSL 1.1 when present (Qt 5.12 vs host OpenSSL 3).
+if [ -n "${OPENSSL_ROOT_DIR:-}" ] && [ -d "${OPENSSL_ROOT_DIR}/lib" ]; then
+  cp -a "${OPENSSL_ROOT_DIR}/lib/libssl.so"* ./Pdc/lib/ 2>/dev/null || true
+  cp -a "${OPENSSL_ROOT_DIR}/lib/libcrypto.so"* ./Pdc/lib/ 2>/dev/null || true
+fi
 cp $QT_PREFIX_PATH/libexec/QtWebEngineProcess ./Pdc
-cp $QT_PREFIX_PATH/resources/qtwebengine_resources.pak ./Pdc
-cp $QT_PREFIX_PATH/resources/qtwebengine_resources_100p.pak ./Pdc
-cp $QT_PREFIX_PATH/resources/qtwebengine_resources_200p.pak ./Pdc
-cp $QT_PREFIX_PATH/resources/icudtl.dat ./Pdc
+cp ../../../utils/buildings/linux/64bit/qt.conf ./Pdc/
+mkdir -p ./Pdc/resources
+cp $QT_PREFIX_PATH/resources/qtwebengine_resources.pak ./Pdc/resources/
+cp $QT_PREFIX_PATH/resources/qtwebengine_resources_100p.pak ./Pdc/resources/
+cp $QT_PREFIX_PATH/resources/qtwebengine_resources_200p.pak ./Pdc/resources/
+cp $QT_PREFIX_PATH/resources/icudtl.dat ./Pdc/resources/
 
 if [ "$copy_qt_dev_tools" = true ] ; then
-  cp $QT_PREFIX_PATH/resources/qtwebengine_devtools_resources.pak ./Pdc
+  cp $QT_PREFIX_PATH/resources/qtwebengine_devtools_resources.pak ./Pdc/resources/
+fi
+
+mkdir -p ./Pdc/translations
+if [ -d "$QT_PREFIX_PATH/translations/qtwebengine_locales" ]; then
+  cp -a "$QT_PREFIX_PATH/translations/qtwebengine_locales" ./Pdc/translations/
 fi
 
 mkdir ./Pdc/lib/platforms
 cp $QT_PREFIX_PATH/plugins/platforms/libqxcb.so ./Pdc/lib/platforms
-mkdir ./Pdc/xcbglintegrations
-cp $QT_PREFIX_PATH/plugins/xcbglintegrations/libqxcb-glx-integration.so ./Pdc/xcbglintegrations
+mkdir -p ./Pdc/lib/xcbglintegrations
+cp $QT_PREFIX_PATH/plugins/xcbglintegrations/libqxcb-glx-integration.so ./Pdc/lib/xcbglintegrations/
 
 cp -Rv src/pdcd src/Pdc src/simplewallet  src/connectivity_tool ./Pdc
 

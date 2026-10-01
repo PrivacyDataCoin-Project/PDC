@@ -1,20 +1,25 @@
 #!/bin/bash
 script_dir=$( dirname "$(readlink -f "$0")" )
 
-export LD_LIBRARY_PATH=$script_dir/lib
-export QT_PLUGIN_PATH=$script_dir/lib
+# Bundle Qt/OpenSSL first so system OpenSSL 3 cannot satisfy Qt 5.12 SSL symbols.
+export LD_LIBRARY_PATH="$script_dir/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export QT_PLUGIN_PATH="$script_dir/lib"
+export QT_QPA_PLATFORM_PLUGIN_PATH="$script_dir/lib/platforms"
 
-echo $LD_LIBRARY_PATH
-echo $QT_PLUGIN_PATH
+# Relocate WebEngine away from the CI Qt prefix baked into libQt5WebEngineCore.
+export QTWEBENGINEPROCESS_PATH="$script_dir/QtWebEngineProcess"
+export QTWEBENGINE_DISABLE_SANDBOX=1
+export QTWEBENGINE_CHROMIUM_FLAGS="${QTWEBENGINE_CHROMIUM_FLAGS:---disable-gpu --no-sandbox}"
 
 out_file_name=~/.local/share/applications/Pdc.desktop
 
 call_app()
 {
-  pushd $script_dir
+  pushd "$script_dir" >/dev/null
   ./Pdc "$@"
-  popd
-  exit
+  status=$?
+  popd >/dev/null
+  exit $status
 }
 
 
@@ -27,7 +32,7 @@ create_desktop_icon()
     echo Version=1.0 | tee -a $target_file_name  > /dev/null
     echo Name=Pdc | tee -a $target_file_name > /dev/null
     echo GenericName=Pdc | tee -a $target_file_name  > /dev/null
-    echo Comment=Privacy blockchain | tee -a $target_file_name > /dev/null
+    echo Comment=Privacy blockchain | tee -a $target_file_name  > /dev/null
     echo Icon=$script_dir/html/files/desktop_linux_icon.png | tee -a $target_file_name > /dev/null
     echo Exec=$script_dir/Pdc.sh --deeplink-params=%u | tee -a $target_file_name  > /dev/null
     echo Terminal=true | tee -a $target_file_name  > /dev/null

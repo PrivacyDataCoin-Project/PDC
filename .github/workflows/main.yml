@@ -140,42 +140,55 @@ jobs:
           cp -r ../../src/gui/qt-daemon/layout/html Pdc-Gui-${TAG}/html
           cp ../../utils/buildings/linux/64bit/Pdc.sh Pdc-Gui-${TAG}/
           cp ../../utils/buildings/linux/64bit/Pdc.desktop Pdc-Gui-${TAG}/
+          # qt.conf remaps Prefix/Data away from the CI path baked into Qt WebEngine.
+          cp ../../utils/buildings/linux/64bit/qt.conf Pdc-Gui-${TAG}/
+          QT_ROOT=/home/runner/work/PDC/Qt/5.12.12/gcc_64
           mkdir Pdc-Gui-${TAG}/lib
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/lib/libicudata.so.56 Pdc-Gui-${TAG}/lib/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/lib/libicui18n.so.56 Pdc-Gui-${TAG}/lib/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/lib/libicuuc.so.56 Pdc-Gui-${TAG}/lib/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/lib/libQt5Core.so.5 Pdc-Gui-${TAG}/lib/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/lib/libQt5DBus.so.5 Pdc-Gui-${TAG}/lib/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/lib/libQt5Gui.so.5 Pdc-Gui-${TAG}/lib/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/lib/libQt5Network.so.5 Pdc-Gui-${TAG}/lib/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/lib/libQt5OpenGL.so.5 Pdc-Gui-${TAG}/lib/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/lib/libQt5Positioning.so.5 Pdc-Gui-${TAG}/lib/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/lib/libQt5PrintSupport.so.5 Pdc-Gui-${TAG}/lib/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/lib/libQt5Qml.so.5 Pdc-Gui-${TAG}/lib/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/lib/libQt5Quick.so.5 Pdc-Gui-${TAG}/lib/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/lib/libQt5Sensors.so.5 Pdc-Gui-${TAG}/lib/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/lib/libQt5Sql.so.5 Pdc-Gui-${TAG}/lib/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/lib/libQt5Widgets.so.5 Pdc-Gui-${TAG}/lib/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/lib/libQt5WebEngine.so.5 Pdc-Gui-${TAG}/lib/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/lib/libQt5WebEngineCore.so.5 Pdc-Gui-${TAG}/lib/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/lib/libQt5WebEngineWidgets.so.5 Pdc-Gui-${TAG}/lib/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/lib/libQt5WebChannel.so.5 Pdc-Gui-${TAG}/lib/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/lib/libQt5XcbQpa.so.5 Pdc-Gui-${TAG}/lib/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/lib/libQt5QuickWidgets.so.5 Pdc-Gui-${TAG}/lib/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/libexec/QtWebEngineProcess Pdc-Gui-${TAG}/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/resources/qtwebengine_resources.pak Pdc-Gui-${TAG}/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/resources/qtwebengine_resources_100p.pak Pdc-Gui-${TAG}/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/resources/qtwebengine_resources_200p.pak Pdc-Gui-${TAG}/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/resources/icudtl.dat Pdc-Gui-${TAG}/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/resources/qtwebengine_devtools_resources.pak Pdc-Gui-${TAG}/
+          cp ${QT_ROOT}/lib/libicudata.so.56 Pdc-Gui-${TAG}/lib/
+          cp ${QT_ROOT}/lib/libicui18n.so.56 Pdc-Gui-${TAG}/lib/
+          cp ${QT_ROOT}/lib/libicuuc.so.56 Pdc-Gui-${TAG}/lib/
+          cp ${QT_ROOT}/lib/libQt5Core.so.5 Pdc-Gui-${TAG}/lib/
+          cp ${QT_ROOT}/lib/libQt5DBus.so.5 Pdc-Gui-${TAG}/lib/
+          cp ${QT_ROOT}/lib/libQt5Gui.so.5 Pdc-Gui-${TAG}/lib/
+          cp ${QT_ROOT}/lib/libQt5Network.so.5 Pdc-Gui-${TAG}/lib/
+          cp ${QT_ROOT}/lib/libQt5OpenGL.so.5 Pdc-Gui-${TAG}/lib/
+          cp ${QT_ROOT}/lib/libQt5Positioning.so.5 Pdc-Gui-${TAG}/lib/
+          cp ${QT_ROOT}/lib/libQt5PrintSupport.so.5 Pdc-Gui-${TAG}/lib/
+          cp ${QT_ROOT}/lib/libQt5Qml.so.5 Pdc-Gui-${TAG}/lib/
+          cp ${QT_ROOT}/lib/libQt5Quick.so.5 Pdc-Gui-${TAG}/lib/
+          cp ${QT_ROOT}/lib/libQt5Sensors.so.5 Pdc-Gui-${TAG}/lib/
+          cp ${QT_ROOT}/lib/libQt5Sql.so.5 Pdc-Gui-${TAG}/lib/
+          cp ${QT_ROOT}/lib/libQt5Widgets.so.5 Pdc-Gui-${TAG}/lib/
+          cp ${QT_ROOT}/lib/libQt5WebEngine.so.5 Pdc-Gui-${TAG}/lib/
+          cp ${QT_ROOT}/lib/libQt5WebEngineCore.so.5 Pdc-Gui-${TAG}/lib/
+          cp ${QT_ROOT}/lib/libQt5WebEngineWidgets.so.5 Pdc-Gui-${TAG}/lib/
+          cp ${QT_ROOT}/lib/libQt5WebChannel.so.5 Pdc-Gui-${TAG}/lib/
+          cp ${QT_ROOT}/lib/libQt5XcbQpa.so.5 Pdc-Gui-${TAG}/lib/
+          cp ${QT_ROOT}/lib/libQt5QuickWidgets.so.5 Pdc-Gui-${TAG}/lib/
+          # Ship OpenSSL 1.1.1 used at build time; host OpenSSL 3 breaks QSslSocket.
+          cp -a "${OPENSSL_PREFIX}/lib/libssl.so"* Pdc-Gui-${TAG}/lib/
+          cp -a "${OPENSSL_PREFIX}/lib/libcrypto.so"* Pdc-Gui-${TAG}/lib/
+          cp ${QT_ROOT}/libexec/QtWebEngineProcess Pdc-Gui-${TAG}/
+          mkdir -p Pdc-Gui-${TAG}/resources
+          cp ${QT_ROOT}/resources/qtwebengine_resources.pak Pdc-Gui-${TAG}/resources/
+          cp ${QT_ROOT}/resources/qtwebengine_resources_100p.pak Pdc-Gui-${TAG}/resources/
+          cp ${QT_ROOT}/resources/qtwebengine_resources_200p.pak Pdc-Gui-${TAG}/resources/
+          cp ${QT_ROOT}/resources/icudtl.dat Pdc-Gui-${TAG}/resources/
+          cp ${QT_ROOT}/resources/qtwebengine_devtools_resources.pak Pdc-Gui-${TAG}/resources/
+          mkdir -p Pdc-Gui-${TAG}/translations
+          cp -a ${QT_ROOT}/translations/qtwebengine_locales Pdc-Gui-${TAG}/translations/
           mkdir Pdc-Gui-${TAG}/lib/platforms
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/plugins/platforms/libqxcb.so Pdc-Gui-${TAG}/lib/platforms/
-          mkdir Pdc-Gui-${TAG}/xcbglintegrations
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/plugins/xcbglintegrations/libqxcb-glx-integration.so Pdc-Gui-${TAG}/xcbglintegrations
+          cp ${QT_ROOT}/plugins/platforms/libqxcb.so Pdc-Gui-${TAG}/lib/platforms/
+          mkdir -p Pdc-Gui-${TAG}/lib/xcbglintegrations
+          cp ${QT_ROOT}/plugins/xcbglintegrations/libqxcb-glx-integration.so Pdc-Gui-${TAG}/lib/xcbglintegrations/
+          test -f Pdc-Gui-${TAG}/resources/icudtl.dat
+          test -d Pdc-Gui-${TAG}/translations/qtwebengine_locales
+          test -f Pdc-Gui-${TAG}/lib/libssl.so.1.1
+          test -f Pdc-Gui-${TAG}/qt.conf
           # upload-artifact zip of bare dirs drops +x; set modes before tar and publish the archive.
           chmod a+x Pdc-Gui-${TAG}/pdcd Pdc-Gui-${TAG}/connectivity_tool Pdc-Gui-${TAG}/simplewallet Pdc-Gui-${TAG}/Pdc \
             Pdc-Gui-${TAG}/Pdc.sh Pdc-Gui-${TAG}/QtWebEngineProcess
-          chmod a+r Pdc-Gui-${TAG}/Pdc.desktop
+          chmod a+r Pdc-Gui-${TAG}/Pdc.desktop Pdc-Gui-${TAG}/qt.conf
           tar cvfz Pdc-Gui-${TAG}-${LABEL}.tar.gz Pdc-Gui-${TAG}/
 
           echo Pdc GUI AppImage
@@ -189,6 +202,10 @@ jobs:
           mkdir -p Pdc-GUI-${TAG}/usr/share/icons/hicolor/256x256/apps
           cp -r ../../src/gui/qt-daemon/layout/html Pdc-GUI-${TAG}/usr/bin/
           cp ${TARGETS} Pdc-GUI-${TAG}/usr/bin/
+          cp ../../utils/buildings/linux/64bit/qt.conf Pdc-GUI-${TAG}/usr/bin/
+          # Seed OpenSSL 1.1 before linuxdeployqt so SSL resolves inside the AppImage.
+          cp -a "${OPENSSL_PREFIX}/lib/libssl.so"* Pdc-GUI-${TAG}/usr/lib/
+          cp -a "${OPENSSL_PREFIX}/lib/libcrypto.so"* Pdc-GUI-${TAG}/usr/lib/
           cp ../../utils/buildings/linux/64bit/Pdc.desktop Pdc-GUI-${TAG}/usr/share/applications/Pdc.desktop
           cp ../../resources/app_icon.svg Pdc-GUI-${TAG}/usr/share/icons/hicolor/scalable/apps/Pdc.svg
           cp ../../resources/app_icon_256.png Pdc-GUI-${TAG}/usr/share/icons/hicolor/256x256/apps/Pdc.png
@@ -197,6 +214,16 @@ jobs:
           wget https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
           chmod 777 linuxdeployqt-continuous-x86_64.AppImage
           /home/runner/work/PDC/PDC/build/src/linuxdeployqt-continuous-x86_64.AppImage ./Pdc-GUI-${TAG}/usr/share/applications/Pdc.desktop -qmake=/home/runner/work/PDC/Qt/5.12.12/gcc_64/bin/qmake
+          # Ensure WebEngine ICU/locales survive linuxdeployqt (layout expected by qt.conf).
+          mkdir -p Pdc-GUI-${TAG}/usr/bin/resources Pdc-GUI-${TAG}/usr/bin/translations
+          cp -n /home/runner/work/PDC/Qt/5.12.12/gcc_64/resources/icudtl.dat Pdc-GUI-${TAG}/usr/bin/resources/ 2>/dev/null || \
+            cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/resources/icudtl.dat Pdc-GUI-${TAG}/usr/bin/resources/
+          cp -n /home/runner/work/PDC/Qt/5.12.12/gcc_64/resources/qtwebengine_resources*.pak Pdc-GUI-${TAG}/usr/bin/resources/ 2>/dev/null || true
+          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/resources/qtwebengine_resources.pak Pdc-GUI-${TAG}/usr/bin/resources/
+          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/resources/qtwebengine_resources_100p.pak Pdc-GUI-${TAG}/usr/bin/resources/
+          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/resources/qtwebengine_resources_200p.pak Pdc-GUI-${TAG}/usr/bin/resources/
+          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/resources/qtwebengine_devtools_resources.pak Pdc-GUI-${TAG}/usr/bin/resources/
+          cp -a /home/runner/work/PDC/Qt/5.12.12/gcc_64/translations/qtwebengine_locales Pdc-GUI-${TAG}/usr/bin/translations/
           wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod 777 appimagetool-x86_64.AppImage
           rm -rf Pdc-GUI-${TAG}/AppRun
