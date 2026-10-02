@@ -755,6 +755,16 @@ public:
   };
 
 
+  struct log_files_size_response
+  {
+    uint64_t total_size;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(total_size)
+    END_KV_SERIALIZE_MAP()
+  };
+
+
   struct api_response
   {
 //    std::string request_id;
