@@ -1050,7 +1050,7 @@ namespace currency
         KV_SERIALIZE(default_fee)                DOC_DSCR("Default fee for transactions.") DOC_EXMP(10000000000) DOC_END
         KV_SERIALIZE(minimum_fee)                DOC_DSCR("Minimum fee for transactions.") DOC_EXMP(10000000000) DOC_END
         KV_SERIALIZE(mi)                         DOC_DSCR("The most recent mainterner's info.") DOC_EXMP_AUTO() DOC_END
-        KV_SERIALIZE(version)                    DOC_DSCR("Daemon version.") DOC_EXMP("v2.3.0") DOC_END
+        KV_SERIALIZE(version)                    DOC_DSCR("Daemon version.") DOC_EXMP("v2.3.1") DOC_END
 
         // Fields dependent on flags for their inclusion
         KV_SERIALIZE(net_time_delta_median)      DOC_DSCR("A value of 0 indicates no time synchronization issues, while a value of 1 indicates the presence of time sync issues. Only available if the COMMAND_RPC_GET_INFO_FLAG_NET_TIME_DELTA_MEDIAN flag is set.") DOC_EXMP(0) DOC_END
