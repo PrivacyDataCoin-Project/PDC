@@ -999,6 +999,32 @@ namespace log_space
       return true;
     }
 
+    bool get_log_files_size(uint64_t& size, const std::set<std::string>& additional_log_names)
+    {
+      size = 0;
+      uint64_t total_size = 0;
+      for (const auto& entry : m_log_streams)
+      {
+        uint64_t stream_size = 0;
+        if (!entry.first->get_log_files_size(stream_size, additional_log_names) || stream_size > (std::numeric_limits<uint64_t>::max)() - total_size)
+          return false;
+        total_size += stream_size;
+      }
+      size = total_size;
+      return true;
+    }
+
+    bool clear_log_files(const std::set<std::string>& additional_log_names)
+    {
+      bool success = true;
+      for (const auto& entry : m_log_streams)
+      {
+        if (!entry.first->clear_log_files(additional_log_names))
+          success = false;
+      }
+      return success;
+    }
+
     std::string copy_logs_to_buffer()
     {
       std::string res;
