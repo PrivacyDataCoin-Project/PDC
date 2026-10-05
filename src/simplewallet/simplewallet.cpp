@@ -1543,7 +1543,7 @@ bool simple_wallet::validate_wrap_status(uint64_t amount)
 
   currency::void_struct req = AUTO_VAL_INIT(req);
   currency::rpc_get_wrap_info_response res = AUTO_VAL_INIT(res);
-  bool r = epee::net_utils::invoke_http_json_remote_command2("http://wrapped.pdc.org/api2/get_wrap_info", req, res, http_client, 10000);
+  bool r = epee::net_utils::invoke_http_json_remote_command2("http://wrapped.privacydatacoin.com/api2/get_wrap_info", req, res, http_client, 10000);
   if (!r)
   {
     fail_msg_writer() << "Failed to request wrap status from server, check internet connection";
