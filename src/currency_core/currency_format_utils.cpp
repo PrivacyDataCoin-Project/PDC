@@ -2758,7 +2758,7 @@ namespace currency
         CHECK_AND_ASSERT_MES(r, false, "generate_NLSAG_sig failed");
       }
 
-      LOG_PRINT2("construct_tx.log", "transaction_created: " << get_transaction_hash(tx) << ENDL << obj_to_json_str(tx) << ENDL << ss_ring_s.str(), LOG_LEVEL_3);
+      LOG_PRINT2(CURRENCY_CONSTRUCT_TX_LOG_FILENAME, "transaction_created: " << get_transaction_hash(tx) << ENDL << obj_to_json_str(tx) << ENDL << ss_ring_s.str(), LOG_LEVEL_3);
     }
 
     //
@@ -3531,6 +3531,7 @@ namespace currency
       auto blextin_ptr = std::make_shared<currency::block_extended_info>();
       bool r = currency::parse_and_validate_block_from_blob(bl_entry.block, blextin_ptr->bl);
       bdde.block_ptr = blextin_ptr;
+      bdde.compact = bl_entry.compact;
       CHECK_AND_ASSERT_MES(r, false, "failed to parse block from blob: " << string_tools::buff_to_hex_nodelimer(bl_entry.block));
       size_t i = 0;
       if (bl_entry.tx_global_outs.size())

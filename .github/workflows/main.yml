@@ -283,7 +283,7 @@ jobs:
  # Mac builds on Catalina VM
   macos_build:
     name: macOS
-    runs-on: macos-14
+    runs-on: macos-latest
     env:
       LABEL: osx
       CCACHE_DIR: ${{ github.workspace }}/.ccache
@@ -307,7 +307,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.BOOST_ROOT_DIR }}
-          key: boost-1.84.0-macos-14-gui-static-icu-off-v1
+          key: boost-1.84.0-macos-latest-gui-static-icu-off-v1
 
       - name: Install Boost
         if: steps.cache-boost.outputs.cache-hit != 'true'

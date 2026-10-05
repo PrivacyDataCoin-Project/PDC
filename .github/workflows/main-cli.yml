@@ -160,7 +160,7 @@ jobs:
   # Mac builds on Catalina VM
   macos_build:
     name: macOS
-    runs-on: macos-14
+    runs-on: macos-latest
     env:
       LABEL: osx
       CCACHE_DIR: ${{ github.workspace }}/.ccache

@@ -875,7 +875,10 @@ void wallets_manager::init_wallet_entry(wallet_vs_options& wo, uint64_t id)
   wo.has_related_alias_in_unconfirmed = false;
   wo.rpc_wrapper.reset(new tools::wallet_rpc_server(wo.w.unlocked_get()));
   if (m_remote_node_mode)
+  {
+    wo.w.unlocked_get()->set_compact_sync(true);
     wo.core_conf = currency::get_default_core_runtime_config();
+  }
   else
   {
 #ifndef MOBILE_WALLET_BUILD
