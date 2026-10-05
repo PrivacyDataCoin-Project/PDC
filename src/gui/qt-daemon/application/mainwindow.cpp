@@ -11,12 +11,15 @@
 #include <QPrintDialog>
 #include <QScreen>
 #include <QTimer>
+#include <set>
 
 #include "string_coding.h"
 #include "gui_utils.h"
 #include "notification_helper.h"
 #include "common/config_encrypt_helper.h"
 #include "currency_core/basic_kv_structs.h"
+#include "currency_core/currency_config.h"
+#include "profile_tools.h"
 
 #define PREPARE_ARG_FROM_JSON(arg_type, var_name)   \
   arg_type var_name = AUTO_VAL_INIT(var_name); \
@@ -70,27 +73,22 @@ QString make_response_dbg(const T& r, const std::string& location)
   }
 
 #include "mainwindow.h"
-// 
-// void MediatorObject::from_html_to_c(const QString &text)
-// {
-//   from_c_to_html(text);
-// }
-// 
-// template<typename Arg, typename R, typename C>
-// struct InvokeWrapper {
-//   R *receiver;
-//   void (C::*memberFun)(Arg);
-//   void operator()(Arg result) {
-//     (receiver->*memberFun)(result);
-//   }
-// };
-// 
-// template<typename Arg, typename R, typename C>
-// InvokeWrapper<Arg, R, C> invoke(R *receiver, void (C::*memberFun)(Arg))
-// {
-//   InvokeWrapper<Arg, R, C> wrapper = { receiver, memberFun };
-//   return wrapper;
-// }
+
+namespace
+{
+  // Known GUI/CLI log files in the configured log folder, including past sessions.
+  // The logger also includes the actual current log and other registered streams.
+  const std::set<std::string> gui_diagnostic_log_names =
+  {
+    CURRENCY_NAME_BASE ".log",
+    CURRENCY_CONSTRUCT_TX_LOG_FILENAME,
+    CURRENCY_FAILED_MINED_BLOCKS_LOG_FILENAME,
+    EPEE_PROFILE_DETAILS_LOG_FILENAME,
+    CURRENCY_NAME_BASE "d.log",
+    "simplewallet.log",
+    "plain_wallet.log"
+  };
+}
 
 
 std::wstring convert_to_lower_via_qt(const std::wstring& w)
@@ -1876,6 +1874,26 @@ QString MainWindow::get_log_level(const QString& param)
   PREPARE_RESPONSE(currency::struct_with_one_t_type<int>, ar);
   ar.response_data.v = epee::log_space::get_set_log_detalisation_level();
   ar.error_code = API_RETURN_CODE_OK;
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+
+QString MainWindow::get_log_files_size(const QString& param)
+{
+  TRY_ENTRY();
+  PREPARE_RESPONSE(view::log_files_size_response, ar);
+  ar.error_code = log_space::log_singletone::get_log_files_size(ar.response_data.total_size, gui_diagnostic_log_names)
+    ? API_RETURN_CODE_OK : API_RETURN_CODE_FAIL;
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+
+QString MainWindow::clear_log_files(const QString& param)
+{
+  TRY_ENTRY();
+  view::api_response ar = AUTO_VAL_INIT(ar);
+  ar.error_code = log_space::log_singletone::clear_log_files(gui_diagnostic_log_names)
+    ? API_RETURN_CODE_OK : API_RETURN_CODE_FAIL;
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }

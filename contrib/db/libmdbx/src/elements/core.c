@@ -7504,6 +7504,15 @@ bailout:
   return rc;
 }
 
+/* Largest grow/shrink that fits in uint16 pages and is a multiple of both the
+ * DB page and the OS page. UINT16_MAX DB pages are not OS-aligned when the DB
+ * page is smaller than the OS page (4 KiB DB, 16 KiB OS). */
+static size_t mdbx_geo_max_step(const MDBX_env *env) {
+  const size_t align = env->me_os_psize > env->me_psize ? env->me_os_psize
+                                                        : env->me_psize;
+  return pgno2bytes(env, UINT16_MAX) & ~(align - 1);
+}
+
 __cold LIBMDBX_API int
 mdbx_env_set_geometry(MDBX_env *env, intptr_t size_lower, intptr_t size_now,
                       intptr_t size_upper, intptr_t growth_step,
@@ -7684,15 +7693,21 @@ mdbx_env_set_geometry(MDBX_env *env, intptr_t size_lower, intptr_t size_now,
   }
   if (growth_step == 0 && shrink_threshold > 0)
     growth_step = 1;
+  /* bytes2pgno() uses the current me_psize. On a 16 KiB OS page that is still
+   * the OS page until the requested DB page (4 KiB) is installed. Convert
+   * grow/shrink with the requested page size, then clamp to a step that stays
+   * OS-aligned so mdbx_meta_model's uint16 grow field matches. */
+  if (!env->me_map && pagesize != (intptr_t)env->me_psize)
+    mdbx_setup_pagesize(env, (size_t)pagesize);
   growth_step = roundup_powerof2(growth_step, env->me_os_psize);
   if (bytes2pgno(env, growth_step) > UINT16_MAX)
-    growth_step = pgno2bytes(env, UINT16_MAX);
+    growth_step = mdbx_geo_max_step(env);
 
   if (shrink_threshold < 0)
     shrink_threshold = growth_step + growth_step;
   shrink_threshold = roundup_powerof2(shrink_threshold, env->me_os_psize);
   if (bytes2pgno(env, shrink_threshold) > UINT16_MAX)
-    shrink_threshold = pgno2bytes(env, UINT16_MAX);
+    shrink_threshold = mdbx_geo_max_step(env);
 
   /* save user's geo-params for future open/create */
   env->me_dbgeo.lower = size_lower;

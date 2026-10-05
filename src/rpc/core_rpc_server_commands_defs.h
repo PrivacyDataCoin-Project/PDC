@@ -262,10 +262,12 @@ namespace currency
     {
       uint64_t minimum_height;
       std::list<crypto::hash> block_ids;
+      bool m_return_compact = false;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(minimum_height)                  DOC_DSCR("The minimum height of the returning buch of blocks.") DOC_EXMP(0) DOC_END
         KV_SERIALIZE_CONTAINER_POD_AS_BLOB(block_ids) /* TODO !!! DOC_DSCR("Current state of the local blockchain. Hashes of the most recent 10 blocks goes first, then each 2nd, then 4th, 8, 16, 32, 64 and so on, and the last one is always hash of the genesis block.") DOC_END */
+        KV_SERIALIZE(m_return_compact)
       END_KV_SERIALIZE_MAP()
     };
 
@@ -1021,6 +1023,7 @@ namespace currency
       std::list<bool> is_hardfok_active;
       //market
       uint64_t offers_count;
+      std::string version;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
@@ -1047,6 +1050,7 @@ namespace currency
         KV_SERIALIZE(default_fee)                DOC_DSCR("Default fee for transactions.") DOC_EXMP(10000000000) DOC_END
         KV_SERIALIZE(minimum_fee)                DOC_DSCR("Minimum fee for transactions.") DOC_EXMP(10000000000) DOC_END
         KV_SERIALIZE(mi)                         DOC_DSCR("The most recent mainterner's info.") DOC_EXMP_AUTO() DOC_END
+        KV_SERIALIZE(version)                    DOC_DSCR("Daemon version.") DOC_EXMP("v2.3.1") DOC_END
 
         // Fields dependent on flags for their inclusion
         KV_SERIALIZE(net_time_delta_median)      DOC_DSCR("A value of 0 indicates no time synchronization issues, while a value of 1 indicates the presence of time sync issues. Only available if the COMMAND_RPC_GET_INFO_FLAG_NET_TIME_DELTA_MEDIAN flag is set.") DOC_EXMP(0) DOC_END
