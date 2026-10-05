@@ -170,9 +170,6 @@ To build GUI application:
 
 ## Supporting project/donations
 
-PDC @dev<br />
-BTC bc1qpa8w8eaehlplfepmnzpd7v9j046899nktxnkxp<br />
-BCH qqgq078vww5exd9kt3frx6krdyznmp80hcygzlgqzd<br />
-ETH 0x206c52b78141498e74FF074301ea90888C40c178<br />
-XMR 45gp9WTobeB5Km3kLQgVmPJkvm9rSmg4gdyHheXqXijXYMjUY48kLgL7QEz5Ar8z9vQioQ68WYDKsQsjAEonSeFX4UeLSiX<br />
+PDC: @arqtras<br />
+XMR: 44xwrxeWXiCQJhvxxa5sVn6etiCoRAzHkMRJP6re2ySXXCJd4S5qvshjnyhePGFSftCjBHNKAdH5e2nZyrJgNTowBdGzRaU<br />
 
