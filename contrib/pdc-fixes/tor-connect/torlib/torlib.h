@@ -36,6 +36,8 @@
 #include "Cell.h"
 #include "tor_lib_iface.h"
 
+#include <boost/asio/executor_work_guard.hpp>
+
 enum class link_specifier_type : u8
 {
 	ipv4 = 0,
@@ -60,7 +62,11 @@ private:
 	string GetDataFromUrlAsync(const string host, const int port, const string target);
 
 	net::io_service io_service;
-	shared_ptr<net::io_service::work> work;
+	// io_service::work still exists on Boost 1.75-1.84, but not once io_service
+	// is only an alias of io_context (Asio >= 1.87 shim). executor_work_guard
+	// has been available since Boost 1.66.
+	using io_work = net::executor_work_guard<net::io_context::executor_type>;
+	shared_ptr<io_work> work;
 	unique_ptr<net::deadline_timer> dtimer;
 	unique_ptr<NetConnect> net_connect;
 	bool operation_completed = false;
