@@ -30,7 +30,7 @@ jobs:
       BOOST_ROOT_DIR: ${{ github.workspace }}/boost_1_80_0
       OPENSSL_PREFIX: ${{ github.workspace }}/openssl
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           submodules: recursive
@@ -43,7 +43,7 @@ jobs:
 
       - name: Cache Boost 1.80.0
         id: cache-boost
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ env.BOOST_ROOT_DIR }}
           key: boost-1.80.0-ubuntu-22.04-gui-v1
@@ -60,7 +60,7 @@ jobs:
 
       - name: Cache OpenSSL 1.1.1w
         id: cache-openssl
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ env.OPENSSL_PREFIX }}
           key: openssl-1.1.1w-ubuntu-22.04-gui-v1
@@ -78,7 +78,7 @@ jobs:
 
       # Install Qt
       - name: Install Qt
-        uses: jurplel/install-qt-action@v3
+        uses: jurplel/install-qt-action@v4
         with:
           aqtversion: '==3.1.*'
           version: '5.12.12'
@@ -88,7 +88,7 @@ jobs:
           modules: 'debug_info qtcharts qtdatavis3d qtnetworkauth qtpurchasing qtscript qtvirtualkeyboard qtwebengine qtwebglplugin'
 
       - name: Cache ccache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ env.CCACHE_DIR }}
           key: ccache-gui-ubuntu-22.04-${{ github.sha }}
@@ -268,14 +268,14 @@ jobs:
 
       # Upload to GH Actions Artifacts
       - name: Upload To GH Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Pdc-Gui-${{ github.sha }}-${{ env.LABEL }}
           path: ./build/src/Pdc-Gui-${{ github.sha }}-${{ env.LABEL }}.tar.gz
 
       # Upload to GH Actions Artifacts AppData
       - name: Upload To GH Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Pdc-GUI-${{ github.sha }}-${{ env.LABEL }}.AppImage
           path: ./build/src/Pdc-GUI-${{ github.sha }}-${{ env.LABEL }}.AppImage
@@ -292,7 +292,7 @@ jobs:
       CCACHE_COMPILERCHECK: content
       BOOST_ROOT_DIR: ${{ github.workspace }}/boost_1_84_0
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           submodules: recursive
@@ -304,7 +304,7 @@ jobs:
 
       - name: Cache Boost 1.84.0
         id: cache-boost
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ env.BOOST_ROOT_DIR }}
           key: boost-1.84.0-macos-latest-gui-static-icu-off-v1
@@ -320,7 +320,7 @@ jobs:
           cd ..
 
       - name: Cache ccache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ env.CCACHE_DIR }}
           key: ccache-gui-osx-${{ github.sha }}
@@ -440,7 +440,7 @@ jobs:
 
       # Upload to GH Actions Artifacts
       - name: Upload To GH Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Pdc-Gui-${{ github.sha }}-${{ env.LABEL }}
           path: ./build/src/Pdc-Gui-${{ github.sha }}-${{ env.LABEL }}.tar.gz
@@ -454,7 +454,7 @@ jobs:
       MSBUILD_PATH: "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/MSBuild/Current/Bin"
       LABEL: windows
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           submodules: recursive
@@ -462,7 +462,7 @@ jobs:
       # Boost.Asio 1.84 still uses OpenSSL 1.1 ASN.1 internals; Chocolatey OpenSSL 4.x breaks the Windows build.
       - name: Cache OpenSSL 1.1.1w
         id: cache-openssl
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: C:/OpenSSL-Win64
           key: openssl-1.1.1w-win64-msvc2022-nasm-off
@@ -489,7 +489,7 @@ jobs:
 
       # Install QT
       - name: Install Qt
-        uses: jurplel/install-qt-action@v3
+        uses: jurplel/install-qt-action@v4
         with:
           version: '5.12.12'
           host: 'windows'
@@ -499,7 +499,7 @@ jobs:
 
       - name: Cache Boost 1.84.0
         id: cache-boost
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: C:/local/boost_1_84_0
           key: boost-1.84.0-win64-msvc-14.3-v1
@@ -565,7 +565,7 @@ jobs:
 
       # Upload to GH Actions Artifacts
       - name: Upload To GH Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Pdc-Gui-${{ github.sha }}-${{ env.LABEL }}
           path: ./build/src/Release/Pdc-Gui-${{ github.sha }}
@@ -588,7 +588,7 @@ jobs:
 
       # Upload to GH Actions Artifacts EXE
       - name: Upload To GH Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Pdc-Gui-${{ github.sha }}-${{ env.LABEL }}.exe
           path: ./build/src/Release/Pdc-Gui-${{ github.sha }}-${{ env.LABEL }}.exe

@@ -150,7 +150,9 @@ namespace tools
           {
             // The write lock is taken only for a read-write transaction.
             if (!read_only)
+            {
               CRITICAL_SECTION_UNLOCK(m_write_exclusive_lock);
+            }
             //throw exception to avoid regular code execution 
             ASSERT_MES_AND_THROW_LMDB(res, "Unable to mdb_txn_begin");
           }
