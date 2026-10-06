@@ -170,4 +170,11 @@ if [ -n "$QTCORE" ]; then
   fi
 fi
 
+# The nested helper must already be signed before codesign seals
+# QtWebEngineCore.framework. The ad-hoc script replaces this signature
+# with Qt's JIT entitlements afterwards.
+HELPER_APP="$(cd "$(dirname "$HELPER")/../.." && pwd)"
+note "ad-hoc signing $HELPER_APP so the framework seal can proceed"
+codesign --force --sign - "$HELPER_APP"
+
 note "Qt WebEngine rpaths fixed"

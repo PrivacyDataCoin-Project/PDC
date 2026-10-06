@@ -608,7 +608,11 @@ jobs:
         uses: Minionguyjpro/Inno-Setup-Action@v1.2.9
         with:
           path: build/src/Release/Pdc-Gui-${{ github.sha }}/setup_64.iss
-          options: /O+ /DBinariesPath=..\Pdc-Gui-${{ github.sha }} /O..\Pdc\build\src\Release /FPdc-Gui-${{ github.sha }}-${{ env.LABEL }}
+          options: |
+            /O+
+            /DBinariesPath=..\Pdc-Gui-${{ github.sha }}
+            /O..\Pdc\build\src\Release
+            /FPdc-Gui-${{ github.sha }}-${{ env.LABEL }}
 
       # Compile .ISS to .EXE Installer - Release
       - name: Compile .ISS to .EXE Installer - Release
@@ -616,7 +620,11 @@ jobs:
         uses: Minionguyjpro/Inno-Setup-Action@v1.2.9
         with:
           path: build/src/Release/Pdc-Gui-${{ github.event.release.tag_name }}/setup_64.iss
-          options: /O+ /DBinariesPath=..\Pdc-Gui-${{ github.event.release.tag_name }} /O..\Pdc\build\src\Release /FPdc-Gui-${{ github.event.release.tag_name }}-${{ env.LABEL }}
+          options: |
+            /O+
+            /DBinariesPath=..\Pdc-Gui-${{ github.event.release.tag_name }}
+            /O..\Pdc\build\src\Release
+            /FPdc-Gui-${{ github.event.release.tag_name }}-${{ env.LABEL }}
 
       # Upload to GH Actions Artifacts EXE
       - name: Upload To GH Artifacts
