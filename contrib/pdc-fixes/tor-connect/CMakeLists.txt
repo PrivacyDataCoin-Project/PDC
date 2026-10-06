@@ -27,7 +27,7 @@ set(OPENSSL_USE_STATIC_LIBS TRUE) # link statically
 target_include_directories(${PROJECT_NAME} PUBLIC ${OPENSSL_INCLUDE_DIR})
 target_link_libraries(${PROJECT_NAME} PRIVATE OpenSSL::SSL OpenSSL::Crypto)
 if(WIN32)
-  target_link_libraries(${PROJECT_NAME} Crypt32)
+  target_link_libraries(${PROJECT_NAME} PRIVATE Crypt32)
 endif()
 
 message(STATUS "SSL INCLUDE DIRS: ${OPENSSL_INCLUDE_DIR}")

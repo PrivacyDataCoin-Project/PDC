@@ -19,5 +19,5 @@ add_library(lmdb  ${lmdb_sources})
 target_link_libraries(lmdb PRIVATE ${CMAKE_THREAD_LIBS_INIT})
 
 if(WIN32)
-  target_link_libraries(lmdb ntdll)
+  target_link_libraries(lmdb PRIVATE ntdll)
 endif()
