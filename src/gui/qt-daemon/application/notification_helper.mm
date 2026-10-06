@@ -1,5 +1,5 @@
-#include "notification_helper.h"
 #include <UserNotifications/UserNotifications.h>
+#include "notification_helper.h"
 
 void notification_helper::show(const std::string& title, const std::string& message)
 {
