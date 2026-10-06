@@ -168,6 +168,7 @@ jobs:
       CCACHE_COMPRESS: "1"
       CCACHE_COMPILERCHECK: content
       BOOST_ROOT_DIR: ${{ github.workspace }}/boost_1_84_0
+      OPENSSL_PREFIX: ${{ github.workspace }}/openssl
     steps:
       - uses: actions/checkout@v7
         with:
@@ -177,7 +178,7 @@ jobs:
       # Fetch Dependencies
       - name: Dependencies
         run: |
-          brew install --force ccache cmake openssl@3
+          brew install --force ccache cmake
 
       - name: Cache Boost 1.84.0
         id: cache-boost
@@ -196,6 +197,24 @@ jobs:
           ./b2 -j"$(sysctl -n hw.ncpu)" link=static variant=release threading=multi boost.locale.icu=off
           cd ..
 
+      - name: Cache OpenSSL 1.1.1w
+        id: cache-openssl
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.OPENSSL_PREFIX }}
+          key: openssl-1.1.1w-macos-arm64-min14-static-v1
+
+      - name: Install OpenSSL 1.1.1w
+        if: steps.cache-openssl.outputs.cache-hit != 'true'
+        run: |
+          curl -fL -o openssl-1.1.1w.tar.gz https://github.com/openssl/openssl/releases/download/OpenSSL_1_1_1w/openssl-1.1.1w.tar.gz
+          tar xaf openssl-1.1.1w.tar.gz
+          cd openssl-1.1.1w/
+          ./Configure darwin64-arm64-cc -mmacosx-version-min=14.0 --prefix="${OPENSSL_PREFIX}" --openssldir="${OPENSSL_PREFIX}" no-shared zlib
+          make -j"$(sysctl -n hw.ncpu)"
+          make install_sw
+          cd ..
+
       - name: Cache ccache
         uses: actions/cache@v6
         with:
@@ -212,7 +231,7 @@ jobs:
           cmake \
             -D BOOST_ROOT="${BOOST_ROOT_DIR}" \
             -D BOOST_LIBRARYDIR="${BOOST_ROOT_DIR}/stage/lib" \
-            -D OPENSSL_ROOT_DIR=/opt/homebrew/opt/openssl@3 \
+            -D OPENSSL_ROOT_DIR="${OPENSSL_PREFIX}" \
             -D OPENSSL_USE_STATIC_LIBS=TRUE \
             -D BUILD_GUI=OFF \
             -D CMAKE_BUILD_TYPE=Release \

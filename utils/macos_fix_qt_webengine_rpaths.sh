@@ -32,6 +32,15 @@ APP="${1:?usage: $0 <App.app>}"
 HELPER="$(find "$APP/Contents" -type f -path '*/QtWebEngineProcess.app/Contents/MacOS/QtWebEngineProcess' | head -1 || true)"
 [ -n "$HELPER" ] || die "QtWebEngineProcess not found under $APP"
 
+# install_name_tool invalidates an existing signature and warns. Drop it
+# first. The GUI job signs the bundle afterwards.
+note "removing signatures before install_name_tool"
+while IFS= read -r bin; do
+  [ -f "$bin" ] || continue
+  file "$bin" 2>/dev/null | grep -q 'Mach-O' || continue
+  codesign --remove-signature "$bin" 2>/dev/null || true
+done < <(find "$APP/Contents" -type f)
+
 # LC_LOAD_* names only. Skip LC_ID_DYLIB: that install name is not a runtime
 # search path, and install_name_tool -change does not rewrite it.
 list_linked_dylibs() {
