@@ -8,6 +8,7 @@
 using namespace epee;
 
 #include "core_rpc_server.h"
+#include "recent_blocks_window.h"
 #include "common/command_line.h"
 #include "currency_core/currency_format_utils.h"
 #include "currency_core/account.h"
@@ -277,6 +278,12 @@ namespace currency
   {
     CHECK_CORE_READY();
 
+    if (req.block_ids.empty())
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      return true;
+    }
+
     if (req.block_ids.back() != m_core.get_blockchain_storage().get_block_id_by_height(0))
     {
       //genesis mismatch, return specific
@@ -313,6 +320,12 @@ namespace currency
   bool core_rpc_server::on_get_blocks(const COMMAND_RPC_GET_BLOCKS_FAST::request& req, COMMAND_RPC_GET_BLOCKS_FAST::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
+
+    if (req.block_ids.empty())
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      return true;
+    }
 
     if (req.block_ids.back() != m_core.get_blockchain_storage().get_block_id_by_height(0))
     {
@@ -1003,6 +1016,7 @@ namespace currency
     {
       error_resp.code = CORE_RPC_ERROR_CODE_TOO_BIG_HEIGHT;
       error_resp.message = std::string("To big height: ") + std::to_string(h) + ", current blockchain size = " +  std::to_string(m_core.get_current_blockchain_size());
+      return false;
     }
     res = string_tools::pod_to_hex(m_core.get_block_id_by_height(h));
     return true;
@@ -1334,7 +1348,7 @@ namespace currency
     {
       error_resp.code = CORE_RPC_ERROR_CODE_CORE_BUSY;
       error_resp.message = "Core is busy.";
-      return true;
+      return false;
     }
     extra_alias_entry_base aib = AUTO_VAL_INIT(aib);
     if(!validate_alias_name(req.alias))
@@ -1444,9 +1458,11 @@ namespace currency
     std::unordered_map<uint64_t, std::pair<std::vector<crypto::hash>, std::list<transaction>>> blockchain_txs; // block height -> (vector of tx_ids, list of txs)
     if (req.blocks_limit > 0)
     {
-      uint64_t start_offset = resp.blockchain_top_block_height - req.blocks_limit + 1;
+      uint64_t start_offset = 0;
+      uint64_t block_count = 0;
+      recent_blocks_window(resp.blockchain_top_block_height, req.blocks_limit, start_offset, block_count);
       std::list<block> recent_blocks;
-      LOCAL_CHECK_INT_ERR(bcs.get_blocks(start_offset, static_cast<size_t>(req.blocks_limit), recent_blocks), "cannot get recent blocks");
+      LOCAL_CHECK_INT_ERR(bcs.get_blocks(start_offset, static_cast<size_t>(block_count), recent_blocks), "cannot get recent blocks");
       
       std::vector<crypto::hash> blockchain_tx_ids, missed_tx;
       for(auto& b : recent_blocks)

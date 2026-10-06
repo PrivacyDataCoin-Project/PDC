@@ -3352,6 +3352,8 @@ namespace tools
 		{
 			int n = NUMWORDS; // hardcoded because this is what electrum uses
 
+			if (binary.empty())
+				return "";
 			if (binary.size() % 4 != 0)
 				throw runtime_error("Invalid binary data size for mnemonic encoding");
 			// 4 bytes -> 3 words.  8 digits base 16 -> 3 digits base 1626
