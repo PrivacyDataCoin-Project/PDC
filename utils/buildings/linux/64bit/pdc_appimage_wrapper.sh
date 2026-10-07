@@ -6,9 +6,18 @@ out_file_name="${out_dir}/Pdc.desktop"
 
 export QTWEBENGINE_DISABLE_SANDBOX=1
 export QTWEBENGINE_CHROMIUM_FLAGS="${QTWEBENGINE_CHROMIUM_FLAGS:---disable-gpu --no-sandbox}"
-# Prefer libraries shipped inside the AppImage over host OpenSSL 3.
+# Prefer libraries/plugins shipped inside the AppImage over host OpenSSL 3 / ICU.
 if [ -d "$script_dir/usr/lib" ]; then
   export LD_LIBRARY_PATH="$script_dir/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+  export QT_PLUGIN_PATH="$script_dir/usr/lib${QT_PLUGIN_PATH:+:$QT_PLUGIN_PATH}"
+fi
+if [ -d "$script_dir/usr/plugins" ]; then
+  export QT_PLUGIN_PATH="$script_dir/usr/plugins${QT_PLUGIN_PATH:+:$QT_PLUGIN_PATH}"
+fi
+if [ -d "$script_dir/usr/lib/platforms" ]; then
+  export QT_QPA_PLATFORM_PLUGIN_PATH="$script_dir/usr/lib/platforms"
+elif [ -d "$script_dir/usr/plugins/platforms" ]; then
+  export QT_QPA_PLATFORM_PLUGIN_PATH="$script_dir/usr/plugins/platforms"
 fi
 if [ -x "$script_dir/usr/bin/QtWebEngineProcess" ]; then
   export QTWEBENGINEPROCESS_PATH="$script_dir/usr/bin/QtWebEngineProcess"
