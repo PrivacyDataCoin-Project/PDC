@@ -428,7 +428,9 @@ static __maybe_unused __inline void mdbx_compiler_barrier(void) {
 }
 
 static __maybe_unused __inline void mdbx_memory_barrier(void) {
-#if __has_extension(c_atomic) || __has_extension(cxx_atomic)
+/* GCC advertises c_atomic via __has_extension but only Clang provides
+ * __c11_atomic_thread_fence; prefer the GNU builtin on GCC. */
+#if defined(__clang__) && (__has_extension(c_atomic) || __has_extension(cxx_atomic))
   __c11_atomic_thread_fence(__ATOMIC_SEQ_CST);
 #elif defined(__ATOMIC_SEQ_CST)
   __atomic_thread_fence(__ATOMIC_SEQ_CST);
