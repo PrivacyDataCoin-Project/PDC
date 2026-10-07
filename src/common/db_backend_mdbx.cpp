@@ -157,8 +157,11 @@ namespace tools
           res = mdbx_txn_begin(m_penv, pparent_tx, flags, &p_new_tx);
           if(res != MDBX_SUCCESS)
           {
-            //Important: if mdbx_txn_begin is failed need to unlock previously locked mutex
-            CRITICAL_SECTION_UNLOCK(m_write_exclusive_lock);
+            // The write lock is taken only for a read-write transaction.
+            if (!read_only)
+            {
+              CRITICAL_SECTION_UNLOCK(m_write_exclusive_lock);
+            }
             //throw exception to avoid regular code execution 
             ASSERT_MES_AND_THROW_MDBX(res, "Unable to mdbx_txn_begin");
           }

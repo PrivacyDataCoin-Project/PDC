@@ -26,7 +26,13 @@ if(TARGET randomx-tests)
 endif()
 
 if(MSVC)
-  set_property(TARGET randomx APPEND_STRING PROPERTY COMPILE_FLAGS " /wd4067 /wd4101 /wd4244 /wd4267 /wd4996")
+  # Keep these C/C++ disables off ml64. MASM reports A4018 for /wd.
+  foreach(_pdc_rx_wd /wd4067 /wd4101 /wd4244 /wd4267 /wd4996)
+    target_compile_options(randomx PRIVATE
+      $<$<COMPILE_LANGUAGE:C>:${_pdc_rx_wd}>
+      $<$<COMPILE_LANGUAGE:CXX>:${_pdc_rx_wd}>)
+  endforeach()
+  unset(_pdc_rx_wd)
 elseif(CMAKE_C_COMPILER_ID MATCHES "Clang")
   # Language-scoped options: C-only flags must not be passed to the C++ compiler.
   target_compile_options(randomx PRIVATE

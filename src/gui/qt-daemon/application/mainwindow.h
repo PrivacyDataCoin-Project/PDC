@@ -224,23 +224,23 @@ signals:
 
 private:
   //--------------------  i_core_event_handler --------------------
-  virtual void on_core_event(const std::string event_name, const currency::core_event_v& e);
-  virtual void on_complete_events();
-  virtual void on_clear_events();
+  virtual void on_core_event(const std::string event_name, const currency::core_event_v& e) override;
+  virtual void on_complete_events() override;
+  virtual void on_clear_events() override;
 
   //------- i_view ---------
-  virtual bool update_daemon_status(const view::daemon_status_info& info);
-  virtual bool on_backend_stopped();
-  virtual bool show_msg_box(const std::string& message);
-  virtual bool update_wallet_status(const view::wallet_status_info& wsi);
-  virtual bool update_wallets_info(const view::wallets_summary_info& wsi);
-  virtual bool money_transfer(const view::transfer_event_info& tei);
-  virtual bool wallet_sync_progress(const view::wallet_sync_progres_param& p);
-  virtual bool money_transfer_cancel(const view::transfer_event_info& wsi);
-  virtual bool init(const std::string& path);
-  virtual bool pos_block_found(const currency::block& block_found);
-  virtual bool set_options(const view::gui_options& opt);
-  virtual bool update_tor_status(const view::current_action_status& opt);
+  virtual bool update_daemon_status(const view::daemon_status_info& info) override;
+  virtual bool on_backend_stopped() override;
+  virtual bool show_msg_box(const std::string& message) override;
+  virtual bool update_wallet_status(const view::wallet_status_info& wsi) override;
+  virtual bool update_wallets_info(const view::wallets_summary_info& wsi) override;
+  virtual bool money_transfer(const view::transfer_event_info& tei) override;
+  virtual bool wallet_sync_progress(const view::wallet_sync_progres_param& p) override;
+  virtual bool money_transfer_cancel(const view::transfer_event_info& wsi) override;
+  virtual bool init(const std::string& path) override;
+  virtual bool pos_block_found(const currency::block& block_found) override;
+  virtual bool set_options(const view::gui_options& opt) override;
+  virtual bool update_tor_status(const view::current_action_status& opt) override;
   //--------- QAbstractNativeEventFilter ---------------------------
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
   virtual bool nativeEventFilter(const QByteArray &eventType, void *message, qintptr *result) override;
@@ -250,9 +250,9 @@ private:
   //----------------------------------------------
 
 
-  void closeEvent(QCloseEvent *event);
-  void contextMenuEvent(QContextMenuEvent * event);
-  void changeEvent(QEvent *e);
+  void closeEvent(QCloseEvent *event) override;
+  void contextMenuEvent(QContextMenuEvent * event) override;
+  void changeEvent(QEvent *e) override;
   void on_maximized();
   bool handle_deeplink_params_in_commandline();
   //void setOrientation(Qt::ScreenOrientation orientation);
