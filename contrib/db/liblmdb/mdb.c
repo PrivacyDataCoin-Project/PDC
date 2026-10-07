@@ -253,7 +253,9 @@ union semun {
 #ifdef __GNUC__
 /** Put infrequently used env functions in separate section */
 # ifdef __APPLE__
-#  define	ESECT	__attribute__ ((section("__TEXT,text_env")))
+/* A custom Mach-O section is not marked regular,pure_instructions, so ld
+   cannot emit compact unwind for it. Keep these helpers in __TEXT,__text. */
+#  define	ESECT
 # else
 #  define	ESECT	__attribute__ ((section("text_env")))
 # endif

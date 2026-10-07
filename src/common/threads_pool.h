@@ -13,6 +13,7 @@ namespace utils
 
   struct call_executor_base
   {
+    virtual ~call_executor_base() = default;
     virtual void execute() = 0;
   };
 

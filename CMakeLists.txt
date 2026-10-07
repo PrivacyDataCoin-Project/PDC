@@ -135,7 +135,20 @@ add_definitions("/DBOOST_NO_CXX98_FUNCTION_BASE")
 
 if(MSVC)
   add_definitions("/D_CRT_SECURE_NO_WARNINGS /D_WIN32_WINNT=0x0600 /DWIN32_LEAN_AND_MEAN /DGTEST_HAS_TR1_TUPLE=0")
-  add_compile_options(/bigobj /Zm1000 /Z7 /MP2 /W3 /GS- /wd4996 /wd4503 /wd4345 /wd4091 /FIinline_c.h)
+  # C/C++ only. ml64 reports A4018 for these flags.
+  add_compile_options(
+    "$<$<COMPILE_LANGUAGE:C,CXX>:/bigobj>"
+    "$<$<COMPILE_LANGUAGE:C,CXX>:/Zm1000>"
+    "$<$<COMPILE_LANGUAGE:C,CXX>:/Z7>"
+    "$<$<COMPILE_LANGUAGE:C,CXX>:/MP2>"
+    "$<$<COMPILE_LANGUAGE:C,CXX>:/W3>"
+    "$<$<COMPILE_LANGUAGE:C,CXX>:/GS->"
+    "$<$<COMPILE_LANGUAGE:C,CXX>:/wd4996>"
+    "$<$<COMPILE_LANGUAGE:C,CXX>:/wd4503>"
+    "$<$<COMPILE_LANGUAGE:C,CXX>:/wd4345>"
+    "$<$<COMPILE_LANGUAGE:C,CXX>:/wd4091>"
+    "$<$<COMPILE_LANGUAGE:C,CXX>:/FIinline_c.h>"
+  )
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /STACK:10485760 /DEBUG dbghelp.lib crypt32.lib")
   if(STATIC)
     foreach(VAR CMAKE_C_FLAGS_DEBUG CMAKE_CXX_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE CMAKE_CXX_FLAGS_RELEASE)
@@ -205,10 +218,10 @@ else()
   else()
     set(DEBUG_FLAGS "-g3 -O0")
   endif()
-  set(RELEASE_FLAGS "-Ofast -DNDEBUG -Wno-unused-variable")
+  set(RELEASE_FLAGS "-O3 -ffast-math -DNDEBUG -Wno-unused-variable")
 
   if(NOT APPLE AND NOT (CMAKE_SYSTEM_NAME STREQUAL "Android"))
-    set(RELEASE_FLAGS "${RELEASE_FLAGS} -flto")
+    set(RELEASE_FLAGS "${RELEASE_FLAGS} -flto=auto")
   endif()
   #if(CMAKE_C_COMPILER_ID STREQUAL "GNU" AND NOT MINGW)
   #  set(RELEASE_FLAGS "${RELEASE_FLAGS} -fno-fat-lto-objects")
@@ -272,8 +285,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
   set(CMAKE_C_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fPIC")
 elseif(APPLE)
   find_package(Boost 1.71 REQUIRED COMPONENTS filesystem thread timer date_time chrono regex serialization atomic program_options locale)
-  # Static Boost.Locale needs the system iconv that used to come in via the dylib.
-  list(APPEND Boost_LIBRARIES iconv)
+  # iconv is already linked via CMAKE_EXE_LINKER_FLAGS on Apple.
 else()
   find_package(Boost 1.70 REQUIRED COMPONENTS system filesystem thread timer date_time chrono regex serialization atomic program_options locale log)
 endif()

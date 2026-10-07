@@ -659,8 +659,12 @@ namespace epee
 
 #define DLG_CRITICAL_SECTION_TRY_LOCK(lock) dlg_try_lock_locker(lock)
 
-#define DLG_CRITICAL_SECTION_UNLOCK(lock)   epee::deadlock_guard_singleton::on_unlock(&lock);\
-                                            lock.unlock();
+#define DLG_CRITICAL_SECTION_UNLOCK(lock) \
+  do \
+  { \
+    epee::deadlock_guard_singleton::on_unlock(&lock); \
+    lock.unlock(); \
+  } while (0)
                                             
 
 

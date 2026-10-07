@@ -9,6 +9,15 @@
 #include "include_base_utils.h"
 #include "currency_core/account.h"
 #include "currency_core/currency_format_utils.h"
+#include "common/mnemonic-encoding.h"
+
+TEST(wallet_seed, binary2text_empty_and_zero_word)
+{
+  EXPECT_EQ("", tools::mnemonic_encoding::binary2text({}));
+
+  const std::string text = tools::mnemonic_encoding::binary2text(std::vector<unsigned char>(4, 0));
+  EXPECT_EQ("like like like", text);
+}
 
 TEST(wallet_seed, store_restore_test) 
 {
