@@ -15,38 +15,67 @@ env:
 
 jobs:
 
-# Common Build matrix for builds on Ubuntu Lasted VM
+# Ubuntu GUI matrix: 22.04 (portable / oldest glibc) + 26.04 (native newest).
+  # Artifacts are labeled per runner OS: *-ubuntu-22.04 / *-ubuntu-26.04.
   ubuntu_build:
-    name: Ubuntu 22.04
-    runs-on: ubuntu-22.04
+    name: Ubuntu ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            label: ubuntu-22.04
+            cc: gcc-11
+            cxx: g++-11
+            # Static ICU works on jammy; LTO OK with GCC 11 + Qt 5.12.
+            extra_packages: gcc-11 g++-11 fuse libfuse2
+            shared_icu: "0"
+            disable_lto: "0"
+            linuxdeployqt_flags: ""
+          - os: ubuntu-26.04
+            label: ubuntu-26.04
+            cc: gcc
+            cxx: g++
+            # GCC 15 + system ICU .a hits .sframe link errors; use shared ICU + no LTO.
+            # AppImage tools need extract-and-run / allow-new-glibc on newer hosts.
+            extra_packages: gcc g++ fuse3
+            shared_icu: "1"
+            disable_lto: "1"
+            linuxdeployqt_flags: "-unsupported-allow-new-glibc -no-strip"
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 2G
       CCACHE_COMPRESS: "1"
       CCACHE_COMPILERCHECK: content
-      LABEL: ubuntu-22.04
-      CC: gcc-11
-      CXX: g++-11
+      LABEL: ${{ matrix.label }}
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
       BOOST_ROOT_DIR: ${{ github.workspace }}/boost_1_80_0
       OPENSSL_PREFIX: ${{ github.workspace }}/openssl
+      APPIMAGE_EXTRACT_AND_RUN: "1"
+      # Matrix passes 0/1; Configure unsets when not 1 (CMake DEFINED ENV is true for "0").
+      PDC_SHARED_ICU: ${{ matrix.shared_icu }}
+      PDC_DISABLE_LTO: ${{ matrix.disable_lto }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           submodules: recursive
 
-       # Fetch Dependencies
       - name: Dependencies
         run: |
           sudo apt update
-          sudo apt-get install -y curl build-essential python3-dev autotools-dev libicu-dev libbz2-dev cmake git zlib1g-dev fuse libfuse2 libxcb-xinerama0 gcc-11 g++-11 ccache
+          sudo apt-get install -y curl build-essential python3-dev autotools-dev \
+            libicu-dev libbz2-dev cmake git zlib1g-dev libxcb-xinerama0 ccache \
+            ${{ matrix.extra_packages }}
 
       - name: Cache Boost 1.80.0
         id: cache-boost
         uses: actions/cache@v6
         with:
           path: ${{ env.BOOST_ROOT_DIR }}
-          key: boost-1.80.0-ubuntu-22.04-gui-v1
+          key: boost-1.80.0-${{ matrix.label }}-gui-v1
 
       - name: Install Boost
         if: steps.cache-boost.outputs.cache-hit != 'true'
@@ -63,7 +92,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ${{ env.OPENSSL_PREFIX }}
-          key: openssl-1.1.1w-ubuntu-22.04-gui-v1
+          key: openssl-1.1.1w-${{ matrix.label }}-gui-v1
 
       - name: Install OpenSSL
         if: steps.cache-openssl.outputs.cache-hit != 'true'
@@ -76,7 +105,6 @@ jobs:
           make install_sw
           cd ..
 
-      # Install Qt
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
@@ -91,20 +119,22 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ${{ env.CCACHE_DIR }}
-          key: ccache-gui-ubuntu-22.04-${{ github.sha }}
+          key: ccache-gui-${{ matrix.label }}-${{ github.sha }}
           restore-keys: |
-            ccache-gui-ubuntu-22.04-
+            ccache-gui-${{ matrix.label }}-
 
-     # Configure the project with cmake
       - name: Configure
         run: |
           ccache -z
           mkdir -p build && cd build
+          # CMake treats any set ENV as DEFINED — only keep toggles when explicitly "1".
+          if [[ "${PDC_SHARED_ICU}" != "1" ]]; then unset PDC_SHARED_ICU; fi
+          if [[ "${PDC_DISABLE_LTO}" != "1" ]]; then unset PDC_DISABLE_LTO; fi
           cmake \
             -D STATIC=TRUE \
             -D BOOST_ROOT="${BOOST_ROOT_DIR}" \
             -D OPENSSL_ROOT_DIR="${OPENSSL_PREFIX}" \
-            -D CMAKE_PREFIX_PATH=/home/runner/work/PDC/Qt/5.12.12/gcc_64 \
+            -D CMAKE_PREFIX_PATH="${QT_ROOT_DIR}" \
             -D BUILD_GUI=ON \
             -D CMAKE_BUILD_TYPE=Release \
             -D BUILD_TESTS=OFF \
@@ -112,23 +142,23 @@ jobs:
             -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
             ..
 
-      # Build for linux
       - name: Build
         run: |
           cd build
           make -j"$(nproc)"
           ccache -s
 
-      # Prepare for deploy
       - name: Prepare for Deploy
         id: before_deploy
         env:
           COMMIT_SHA: ${{ github.sha }}
+          LINUXDEPLOYQT_FLAGS: ${{ matrix.linuxdeployqt_flags }}
         run: |
           if [[ "${TAG:5:4}" == "tags" ]]; then export TAG=${TAG:10}; else export TAG=${COMMIT_SHA}; fi
           prj_root=$(pwd)
+          QT_ROOT="${QT_ROOT_DIR:?QT_ROOT_DIR not set by install-qt-action}"
 
-          echo Pdc Gui Tar.Gz
+          echo "Pdc Gui Tar.Gz (${LABEL})"
 
           cd build/src
           TARGETS="pdcd connectivity_tool simplewallet Pdc"
@@ -142,7 +172,6 @@ jobs:
           cp ../../utils/buildings/linux/64bit/Pdc.desktop Pdc-Gui-${TAG}/
           # qt.conf remaps Prefix/Data away from the CI path baked into Qt WebEngine.
           cp ../../utils/buildings/linux/64bit/qt.conf Pdc-Gui-${TAG}/
-          QT_ROOT=/home/runner/work/PDC/Qt/5.12.12/gcc_64
           mkdir Pdc-Gui-${TAG}/lib
           cp ${QT_ROOT}/lib/libicudata.so.56 Pdc-Gui-${TAG}/lib/
           cp ${QT_ROOT}/lib/libicui18n.so.56 Pdc-Gui-${TAG}/lib/
@@ -168,6 +197,15 @@ jobs:
           # Ship OpenSSL 1.1.1 used at build time; host OpenSSL 3 breaks QSslSocket.
           cp -a "${OPENSSL_PREFIX}/lib/libssl.so"* Pdc-Gui-${TAG}/lib/
           cp -a "${OPENSSL_PREFIX}/lib/libcrypto.so"* Pdc-Gui-${TAG}/lib/
+          # Shared-ICU hosts (e.g. 26.04): bundle the exact host ICU SONAMEs Pdc needs.
+          while read -r libpath; do
+            [[ -z "$libpath" || ! -e "$libpath" ]] && continue
+            cp -a "$libpath" "Pdc-Gui-${TAG}/lib/"
+            real=$(readlink -f "$libpath" || true)
+            if [[ -n "$real" && -e "$real" ]]; then
+              cp -a "$real" "Pdc-Gui-${TAG}/lib/"
+            fi
+          done < <(ldd Pdc | awk '/libicu(i18n|uc|data)\.so/{print $3}')
           cp ${QT_ROOT}/libexec/QtWebEngineProcess Pdc-Gui-${TAG}/
           mkdir -p Pdc-Gui-${TAG}/resources
           cp ${QT_ROOT}/resources/qtwebengine_resources.pak Pdc-Gui-${TAG}/resources/
@@ -185,13 +223,32 @@ jobs:
           test -d Pdc-Gui-${TAG}/translations/qtwebengine_locales
           test -f Pdc-Gui-${TAG}/lib/libssl.so.1.1
           test -f Pdc-Gui-${TAG}/qt.conf
+
+          echo "Portability check (bundled lib/ must resolve all ICU + OpenSSL deps)"
+          ldd_out=$(LD_LIBRARY_PATH="$PWD/Pdc-Gui-${TAG}/lib" ldd "Pdc-Gui-${TAG}/Pdc")
+          echo "$ldd_out"
+          if echo "$ldd_out" | grep -E 'libicu|libssl|libcrypto' | grep -q 'not found'; then
+            echo "ERROR: missing bundled ICU/OpenSSL dependency"
+            exit 1
+          fi
+          # Reject accidental link to host ICU that was not copied into lib/.
+          while read -r needed; do
+            [[ -z "$needed" ]] && continue
+            if [[ ! -e "Pdc-Gui-${TAG}/lib/${needed}" ]]; then
+              echo "ERROR: NEEDED ${needed} not present in package lib/"
+              readelf -d Pdc-Gui-${TAG}/Pdc | grep NEEDED
+              ls -la Pdc-Gui-${TAG}/lib/
+              exit 1
+            fi
+          done < <(readelf -d Pdc-Gui-${TAG}/Pdc | sed -n 's/.*Shared library: \[\(libicu[^]]*\)\].*/\1/p')
+
           # upload-artifact zip of bare dirs drops +x; set modes before tar and publish the archive.
           chmod a+x Pdc-Gui-${TAG}/pdcd Pdc-Gui-${TAG}/connectivity_tool Pdc-Gui-${TAG}/simplewallet Pdc-Gui-${TAG}/Pdc \
             Pdc-Gui-${TAG}/Pdc.sh Pdc-Gui-${TAG}/QtWebEngineProcess
           chmod a+r Pdc-Gui-${TAG}/Pdc.desktop Pdc-Gui-${TAG}/qt.conf
           tar cvfz Pdc-Gui-${TAG}-${LABEL}.tar.gz Pdc-Gui-${TAG}/
 
-          echo Pdc GUI AppImage
+          echo "Pdc GUI AppImage (${LABEL})"
 
           rm -rf Pdc-GUI-${TAG}
           mkdir Pdc-GUI-${TAG}
@@ -203,28 +260,32 @@ jobs:
           cp -r ../../src/gui/qt-daemon/layout/html Pdc-GUI-${TAG}/usr/bin/
           cp ${TARGETS} Pdc-GUI-${TAG}/usr/bin/
           cp ../../utils/buildings/linux/64bit/qt.conf Pdc-GUI-${TAG}/usr/bin/
-          # Seed OpenSSL 1.1 before linuxdeployqt so SSL resolves inside the AppImage.
+          # Seed OpenSSL 1.1 (+ host ICU when shared) before linuxdeployqt.
           cp -a "${OPENSSL_PREFIX}/lib/libssl.so"* Pdc-GUI-${TAG}/usr/lib/
           cp -a "${OPENSSL_PREFIX}/lib/libcrypto.so"* Pdc-GUI-${TAG}/usr/lib/
+          cp -a Pdc-Gui-${TAG}/lib/libicu*.so* Pdc-GUI-${TAG}/usr/lib/ 2>/dev/null || true
           cp ../../utils/buildings/linux/64bit/Pdc.desktop Pdc-GUI-${TAG}/usr/share/applications/Pdc.desktop
           cp ../../resources/app_icon.svg Pdc-GUI-${TAG}/usr/share/icons/hicolor/scalable/apps/Pdc.svg
           cp ../../resources/app_icon_256.png Pdc-GUI-${TAG}/usr/share/icons/hicolor/256x256/apps/Pdc.png
           echo "Exec=$prj_root/build/src/Pdc-GUI-${TAG}/usr/bin/Pdc" >> Pdc-GUI-${TAG}/usr/share/applications/Pdc.desktop
           rm -rf /home/runner/work/_temp/
-          wget https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
+          wget -q https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
           chmod 777 linuxdeployqt-continuous-x86_64.AppImage
-          /home/runner/work/PDC/PDC/build/src/linuxdeployqt-continuous-x86_64.AppImage ./Pdc-GUI-${TAG}/usr/share/applications/Pdc.desktop -qmake=/home/runner/work/PDC/Qt/5.12.12/gcc_64/bin/qmake
+          ./linuxdeployqt-continuous-x86_64.AppImage ./Pdc-GUI-${TAG}/usr/share/applications/Pdc.desktop \
+            -qmake="${QT_ROOT}/bin/qmake" ${LINUXDEPLOYQT_FLAGS}
           # Ensure WebEngine ICU/locales survive linuxdeployqt (layout expected by qt.conf).
           mkdir -p Pdc-GUI-${TAG}/usr/bin/resources Pdc-GUI-${TAG}/usr/bin/translations
-          cp -n /home/runner/work/PDC/Qt/5.12.12/gcc_64/resources/icudtl.dat Pdc-GUI-${TAG}/usr/bin/resources/ 2>/dev/null || \
-            cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/resources/icudtl.dat Pdc-GUI-${TAG}/usr/bin/resources/
-          cp -n /home/runner/work/PDC/Qt/5.12.12/gcc_64/resources/qtwebengine_resources*.pak Pdc-GUI-${TAG}/usr/bin/resources/ 2>/dev/null || true
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/resources/qtwebengine_resources.pak Pdc-GUI-${TAG}/usr/bin/resources/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/resources/qtwebengine_resources_100p.pak Pdc-GUI-${TAG}/usr/bin/resources/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/resources/qtwebengine_resources_200p.pak Pdc-GUI-${TAG}/usr/bin/resources/
-          cp /home/runner/work/PDC/Qt/5.12.12/gcc_64/resources/qtwebengine_devtools_resources.pak Pdc-GUI-${TAG}/usr/bin/resources/
-          cp -a /home/runner/work/PDC/Qt/5.12.12/gcc_64/translations/qtwebengine_locales Pdc-GUI-${TAG}/usr/bin/translations/
-          wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          cp -f ${QT_ROOT}/resources/icudtl.dat Pdc-GUI-${TAG}/usr/bin/resources/
+          cp -f ${QT_ROOT}/resources/qtwebengine_resources.pak Pdc-GUI-${TAG}/usr/bin/resources/
+          cp -f ${QT_ROOT}/resources/qtwebengine_resources_100p.pak Pdc-GUI-${TAG}/usr/bin/resources/
+          cp -f ${QT_ROOT}/resources/qtwebengine_resources_200p.pak Pdc-GUI-${TAG}/usr/bin/resources/
+          cp -f ${QT_ROOT}/resources/qtwebengine_devtools_resources.pak Pdc-GUI-${TAG}/usr/bin/resources/
+          cp -a ${QT_ROOT}/translations/qtwebengine_locales Pdc-GUI-${TAG}/usr/bin/translations/
+          # Re-seed ICU/OpenSSL after linuxdeployqt may prune them.
+          cp -a "${OPENSSL_PREFIX}/lib/libssl.so"* Pdc-GUI-${TAG}/usr/lib/
+          cp -a "${OPENSSL_PREFIX}/lib/libcrypto.so"* Pdc-GUI-${TAG}/usr/lib/
+          cp -a Pdc-Gui-${TAG}/lib/libicu*.so* Pdc-GUI-${TAG}/usr/lib/ 2>/dev/null || true
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod 777 appimagetool-x86_64.AppImage
           rm -rf Pdc-GUI-${TAG}/AppRun
           cp ../../utils/buildings/linux/64bit/pdc_appimage_wrapper.sh Pdc-GUI-${TAG}/AppRun
@@ -233,7 +294,7 @@ jobs:
           chmod 777 Pdc-GUI-${TAG}/*/*/*
           chmod 777 Pdc-GUI-${TAG}/*/*/*/*
           chmod 777 Pdc-GUI-${TAG}/*/*/*/*/*
-          ARCH=x86_64 /home/runner/work/PDC/PDC/build/src/appimagetool-x86_64.AppImage ./Pdc-GUI-${TAG} Pdc-GUI-${TAG}-${LABEL}.AppImage
+          ARCH=x86_64 ./appimagetool-x86_64.AppImage ./Pdc-GUI-${TAG} Pdc-GUI-${TAG}-${LABEL}.AppImage
           chmod a+x Pdc-GUI-${TAG}-${LABEL}.AppImage
           # Tag pushes name packages with the tag; copy to sha names for artifact upload.
           # Branch pushes already use sha names — skip same-file cp (GNU cp errors).
