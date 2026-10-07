@@ -15,11 +15,11 @@ env:
 
 jobs:
 
-# Ubuntu GUI matrix: 22.04 (portable / oldest glibc) + 26.04 (native newest).
-  # Artifacts are labeled per runner OS: *-ubuntu-22.04 / *-ubuntu-26.04.
+# One Ubuntu 22.04 GUI archive. glibc 2.35 runs on 22.04 and every newer Ubuntu.
+  # The artifact name stays ubuntu-22.04.
   ubuntu_build:
-    name: Ubuntu ${{ matrix.label }}
-    runs-on: ${{ matrix.os }}
+    name: Ubuntu ubuntu-22.04
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
@@ -33,16 +33,6 @@ jobs:
             shared_icu: "0"
             disable_lto: "0"
             linuxdeployqt_flags: ""
-          - os: ubuntu-26.04
-            label: ubuntu-26.04
-            cc: gcc
-            cxx: g++
-            # GCC 15 + system ICU .a hits .sframe link errors; use shared ICU + no LTO.
-            # AppImage tools need extract-and-run / allow-new-glibc on newer hosts.
-            extra_packages: gcc g++ fuse3
-            shared_icu: "1"
-            disable_lto: "1"
-            linuxdeployqt_flags: "-unsupported-allow-new-glibc -no-strip"
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 2G
@@ -67,8 +57,20 @@ jobs:
         run: |
           sudo apt update
           sudo apt-get install -y curl build-essential python3-dev autotools-dev \
-            libicu-dev libbz2-dev cmake git zlib1g-dev libxcb-xinerama0 ccache \
+            libicu-dev libbz2-dev cmake git zlib1g-dev libxcb-xinerama0 ccache patchelf \
             ${{ matrix.extra_packages }}
+          # Copied into the GUI archive. Newer Ubuntu releases do not have to provide them.
+          sudo apt-get install -y \
+            libnss3 libnspr4 libxss1 libxcomposite1 libxrandr2 libxdamage1 libxfixes3 \
+            libxrender1 libxi6 libxtst6 libxkbcommon0 libxkbcommon-x11-0 \
+            libxcb-glx0 libxcb-shape0 libxcb-shm0 libxcb-sync1 libxcb-randr0 \
+            libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxshmfence1 \
+            libasound2 libfontconfig1 libfreetype6 libdbus-1-3 libexpat1 \
+            libpng16-16 libjpeg-turbo8 libwebp7 libflac8 libopus0 libsnappy1v5 \
+            libvpx7 libevent-2.1-7 libpcre3 libpcre2-8-0 libffi8 libxslt1.1 libxml2 \
+            libbrotli1 libzstd1 liblzma5 libminizip1 libpango-1.0-0 libpangocairo-1.0-0 \
+            libatk1.0-0 libcups2 libpci3 libharfbuzz0b libgraphite2-3 libglib2.0-0 \
+            libbsd0 libmd0 libgl1 libx11-6 libxext6 libxcb1 libdrm2
 
       - name: Cache Boost 1.80.0
         id: cache-boost
@@ -224,23 +226,9 @@ jobs:
           test -f Pdc-Gui-${TAG}/lib/libssl.so.1.1
           test -f Pdc-Gui-${TAG}/qt.conf
 
-          echo "Portability check (bundled lib/ must resolve all ICU + OpenSSL deps)"
-          ldd_out=$(LD_LIBRARY_PATH="$PWD/Pdc-Gui-${TAG}/lib" ldd "Pdc-Gui-${TAG}/Pdc")
-          echo "$ldd_out"
-          if echo "$ldd_out" | grep -E 'libicu|libssl|libcrypto' | grep -q 'not found'; then
-            echo "ERROR: missing bundled ICU/OpenSSL dependency"
-            exit 1
-          fi
-          # Reject accidental link to host ICU that was not copied into lib/.
-          while read -r needed; do
-            [[ -z "$needed" ]] && continue
-            if [[ ! -e "Pdc-Gui-${TAG}/lib/${needed}" ]]; then
-              echo "ERROR: NEEDED ${needed} not present in package lib/"
-              readelf -d Pdc-Gui-${TAG}/Pdc | grep NEEDED
-              ls -la Pdc-Gui-${TAG}/lib/
-              exit 1
-            fi
-          done < <(readelf -d Pdc-Gui-${TAG}/Pdc | sed -n 's/.*Shared library: \[\(libicu[^]]*\)\].*/\1/p')
+          # Copy SONAMEs that differ after 22.04 into lib/, then require them to resolve.
+          bash "${prj_root}/utils/buildings/linux/64bit/linux_bundle_libs.sh" bundle "Pdc-Gui-${TAG}"
+          bash "${prj_root}/utils/buildings/linux/64bit/linux_bundle_libs.sh" check "Pdc-Gui-${TAG}"
 
           # upload-artifact zip of bare dirs drops +x; set modes before tar and publish the archive.
           chmod a+x Pdc-Gui-${TAG}/pdcd Pdc-Gui-${TAG}/connectivity_tool Pdc-Gui-${TAG}/simplewallet Pdc-Gui-${TAG}/Pdc \
@@ -281,10 +269,12 @@ jobs:
           cp -f ${QT_ROOT}/resources/qtwebengine_resources_200p.pak Pdc-GUI-${TAG}/usr/bin/resources/
           cp -f ${QT_ROOT}/resources/qtwebengine_devtools_resources.pak Pdc-GUI-${TAG}/usr/bin/resources/
           cp -a ${QT_ROOT}/translations/qtwebengine_locales Pdc-GUI-${TAG}/usr/bin/translations/
-          # Re-seed ICU/OpenSSL after linuxdeployqt may prune them.
-          cp -a "${OPENSSL_PREFIX}/lib/libssl.so"* Pdc-GUI-${TAG}/usr/lib/
-          cp -a "${OPENSSL_PREFIX}/lib/libcrypto.so"* Pdc-GUI-${TAG}/usr/lib/
-          cp -a Pdc-Gui-${TAG}/lib/libicu*.so* Pdc-GUI-${TAG}/usr/lib/ 2>/dev/null || true
+          # Re-seed the 22.04 private libraries after linuxdeployqt may prune them.
+          cp -a Pdc-Gui-${TAG}/lib/*.so* Pdc-GUI-${TAG}/usr/lib/
+          if [[ -d Pdc-Gui-${TAG}/lib/nss ]]; then
+            mkdir -p Pdc-GUI-${TAG}/usr/lib/nss
+            cp -a Pdc-Gui-${TAG}/lib/nss/. Pdc-GUI-${TAG}/usr/lib/nss/
+          fi
           wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod 777 appimagetool-x86_64.AppImage
           rm -rf Pdc-GUI-${TAG}/AppRun

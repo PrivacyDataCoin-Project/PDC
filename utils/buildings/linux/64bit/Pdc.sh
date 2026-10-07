@@ -5,6 +5,8 @@ script_dir=$( dirname "$(readlink -f "$0")" )
 export LD_LIBRARY_PATH="$script_dir/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export QT_PLUGIN_PATH="$script_dir/lib"
 export QT_QPA_PLATFORM_PLUGIN_PATH="$script_dir/lib/platforms"
+# Qt 5.12 ships the X11 platform plugin. Ubuntu Wayland sessions reach it through XWayland.
+export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-xcb}"
 
 # Relocate WebEngine away from the CI Qt prefix baked into libQt5WebEngineCore.
 export QTWEBENGINEPROCESS_PATH="$script_dir/QtWebEngineProcess"

@@ -31,7 +31,7 @@ call_app()
   usr/bin/Pdc "$@"
   status=$?
   if [ $status -ne 0 ]; then
-    echo $'\n\n\x1b[1mIf Pdc fails to launch, it might need to install xinerama extension for the X C Binding with this command:\n\x1b[2m   sudo apt-get install libxcb-xinerama0\n\n'
+    echo $'\n\n\x1b[1mIf Pdc fails to launch on Ubuntu 24.04 or newer, start it without FUSE:\n\x1b[2m   APPIMAGE_EXTRACT_AND_RUN=1 ./Pdc-GUI-*.AppImage\n\x1b[1mThe unpacked Pdc.sh archive from the same build does not need FUSE.\nThe host still needs OpenGL and X11 or XWayland:\n\x1b[2m   sudo apt-get install libgl1 libx11-6 libxcb1 libxcb-xinerama0\n\n'
   fi
 
   popd >/dev/null
