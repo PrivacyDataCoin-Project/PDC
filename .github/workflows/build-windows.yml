@@ -371,7 +371,7 @@ jobs:
             'connectivity_tool.exe',
             'pdcd.pdb',
             'simplewallet.pdb',
-            'connectivity_tool.pdb',
+            'connectivity_tool.pdb'
             )
           if ('${{ matrix.gui }}' -eq 'true') {
             $expectedFiles += @('Pdc.exe', 'Pdc.pdb')
@@ -468,7 +468,7 @@ jobs:
             'simplewallet.exe',
             'simplewallet.pdb',
             'connectivity_tool.exe',
-            'connectivity_tool.pdb',
+            'connectivity_tool.pdb'
             )
           foreach ($name in $cliFiles) {
             Copy-Item -LiteralPath (Join-Path $releaseDir $name) -Destination $cliRoot -Force
