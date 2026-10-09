@@ -59,11 +59,21 @@ src/vm_compiled_light.cpp
 src/blake2/blake2b.c)
 
 if(NOT ARCH_ID)
-  # allow cross compiling
-  if(CMAKE_SYSTEM_PROCESSOR STREQUAL "")
-    set(CMAKE_SYSTEM_PROCESSOR ${CMAKE_HOST_SYSTEM_PROCESSOR})
+  # Prefer the Visual Studio target platform when cross-compiling. With
+  # `cmake -G "Visual Studio ..." -A ARM64` on an x64 host,
+  # CMAKE_SYSTEM_PROCESSOR often still reports AMD64 (the host), which would
+  # incorrectly select the x86 MASM JIT sources.
+  if(CMAKE_GENERATOR_PLATFORM)
+    set(_randomx_proc "${CMAKE_GENERATOR_PLATFORM}")
+  elseif(CMAKE_VS_PLATFORM_NAME)
+    set(_randomx_proc "${CMAKE_VS_PLATFORM_NAME}")
+  elseif(NOT CMAKE_SYSTEM_PROCESSOR STREQUAL "")
+    set(_randomx_proc "${CMAKE_SYSTEM_PROCESSOR}")
+  else()
+    set(_randomx_proc "${CMAKE_HOST_SYSTEM_PROCESSOR}")
   endif()
-  string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" ARCH_ID)
+  string(TOLOWER "${_randomx_proc}" ARCH_ID)
+  unset(_randomx_proc)
 endif()
 
 if(NOT ARM_ID)
@@ -154,7 +164,9 @@ if(ARCH_ID STREQUAL "ppc64" OR ARCH_ID STREQUAL "ppc64le")
 endif()
 
 # ARMv8
-if(ARM_ID STREQUAL "aarch64" OR ARM_ID STREQUAL "arm64" OR ARM_ID STREQUAL "armv8-a")
+# MSVC ARM64 has no GAS .S support and RandomX's headers gate the A64 JIT on
+# __aarch64__ (not _M_ARM64), so keep the portable/fallback VM on Windows ARM64.
+if((ARM_ID STREQUAL "aarch64" OR ARM_ID STREQUAL "arm64" OR ARM_ID STREQUAL "armv8-a") AND NOT MSVC)
   target_sources(randomx PRIVATE
     src/jit_compiler_a64_static.S
     src/jit_compiler_a64.cpp)

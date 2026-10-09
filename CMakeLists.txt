@@ -134,7 +134,7 @@ add_definitions("/DBOOST_NO_CXX98_FUNCTION_BASE")
 
 
 if(MSVC)
-  add_definitions("/D_CRT_SECURE_NO_WARNINGS /D_WIN32_WINNT=0x0600 /DWIN32_LEAN_AND_MEAN /DGTEST_HAS_TR1_TUPLE=0")
+  add_definitions("/D_CRT_SECURE_NO_WARNINGS /D_WIN32_WINNT=0x0600 /DWIN32_LEAN_AND_MEAN /DNOMINMAX /DGTEST_HAS_TR1_TUPLE=0")
   # C/C++ only. ml64 reports A4018 for these flags.
   add_compile_options(
     "$<$<COMPILE_LANGUAGE:C,CXX>:/bigobj>"

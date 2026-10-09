@@ -9,6 +9,6 @@ repositories.
 
 | Area | Fix |
 |------|-----|
-| randomx | Initialize NEON temps; `struct randomx_vm`; `const char **` for error strings; check blake2b results |
-| tor-connect | OpenSSL 3 via EVP (SHA1/AES); virtual dtor on transport; remove pessimizing `move`; explicit casts |
+| randomx | Initialize NEON temps; `struct randomx_vm`; `const char **` for error strings; check blake2b results; detect VS `-A` target platform for ARCH_ID; skip A64 JIT on MSVC; gate SSSE3 argon2 to x86 MSVC |
+| tor-connect | OpenSSL 3 via EVP (SHA1/AES); virtual dtor on transport; remove pessimizing `move`; explicit casts; `NOMINMAX` for MSVC |
 | miniupnp | Explicit `socklen_t` / `int` casts for pointer diffs and socket APIs |
