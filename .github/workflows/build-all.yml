@@ -13,6 +13,10 @@ on:
         description: 'Linux'
         type: boolean
         default: true
+      windows:
+        description: 'Windows'
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -28,12 +32,14 @@ jobs:
           set -euo pipefail
           if [ "${{ github.event_name }}" = "push" ]; then
             lin=true
+            win=true
           else
             lin='${{ inputs.linux }}'
+            win='${{ inputs.windows }}'
           fi
 
-          if [ "$lin" != "true" ]; then
-            echo "::error title=No platform selected::Tick at least Linux."
+          if [ "$lin" != "true" ] && [ "$win" != "true" ]; then
+            echo "::error title=No platform selected::Tick at least one of Linux, Windows."
             exit 1
           fi
 
@@ -42,7 +48,11 @@ jobs:
             echo
             echo "| Platform | mainnet |"
             echo "| --- | --- |"
-            echo "| Linux | yes |"
+            for row in "Linux:$lin" "Windows:$win"; do
+              name=${row%%:*}; sel=${row##*:}
+              cell=$([ "$sel" = "true" ] && echo 'yes' || echo '-')
+              echo "| $name | $cell |"
+            done
           } >> "$GITHUB_STEP_SUMMARY"
 
   linux-mainnet:
@@ -54,3 +64,14 @@ jobs:
       ref: ${{ github.sha }}
     permissions:
       contents: read
+
+  windows-mainnet:
+    name: Windows (mainnet)
+    needs: check-selection
+    if: ${{ !cancelled() && needs.check-selection.result == 'success' && (github.event_name == 'push' || inputs.windows == true) }}
+    uses: ./.github/workflows/build-windows.yml
+    with:
+      ref: ${{ github.sha }}
+    permissions:
+      contents: read
+      id-token: write
