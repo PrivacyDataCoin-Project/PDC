@@ -80,7 +80,6 @@ jobs:
       ref: ${{ github.sha }}
     permissions:
       contents: read
-      id-token: write
 
   macos-mainnet:
     name: macOS (mainnet)
