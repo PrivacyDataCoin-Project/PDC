@@ -63,14 +63,6 @@ jobs:
             openssl_target: VC-WIN64A
             boost_arch: x86
             gui: true
-          # Qt 6.8.3 has no prebuilt Windows ARM64 Qt WebEngine package.
-          - arch: arm64
-            cmake_arch: ARM64
-            vcvars: vcvarsamd64_arm64.bat
-            vs_component: Microsoft.VisualStudio.Component.VC.Tools.ARM64
-            openssl_target: VC-WIN64-ARM
-            boost_arch: arm
-            gui: false
     # Optional Authenticode signing via Google Cloud KMS (skipped when GCP_*
     # repository variables are unset).
     env:
@@ -418,9 +410,8 @@ jobs:
           }
 
           $headers = (& dumpbin.exe /headers (Join-Path $releaseDir 'pdcd.exe')) -join "`n"
-          $expectedMachine = if ('${{ matrix.arch }}' -eq 'arm64') { 'AA64 machine \(ARM64\)' } else { '8664 machine \(x64\)' }
-          if ($LASTEXITCODE -ne 0 -or $headers -notmatch $expectedMachine) {
-            throw "pdcd.exe is not a ${{ matrix.arch }} PE binary"
+          if ($LASTEXITCODE -ne 0 -or $headers -notmatch '8664 machine \(x64\)') {
+            throw "pdcd.exe is not a x64 PE binary"
           }
 
       - name: Derive package version
@@ -1184,110 +1175,6 @@ jobs:
           "@
           $buildInfo | Set-Content -LiteralPath (Join-Path $cliRoot 'BUILD-INFO.txt') -Encoding utf8
           $buildInfo | Set-Content -LiteralPath (Join-Path $guiRoot 'BUILD-INFO.txt') -Encoding utf8
-
-      - name: Assemble ARM64 CLI package
-        if: matrix.gui == false
-        run: |
-          New-Item -ItemType Directory -Path $env:DIST_DIR -Force | Out-Null
-          $stageRoot = Join-Path $env:RUNNER_TEMP "pdc-stage-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
-          New-Item -ItemType Directory -Path $stageRoot -Force | Out-Null
-          "STAGE_ROOT=$stageRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-          $releaseDir = Join-Path $env:BUILD_DIR 'src\Release'
-          $cliRoot = Join-Path $stageRoot $env:CLI_BASENAME
-          New-Item -ItemType Directory -Path $cliRoot -Force | Out-Null
-
-          $cliFiles = @(
-            'pdcd.exe',
-            'pdcd.pdb',
-            'simplewallet.exe',
-            'simplewallet.pdb',
-            'connectivity_tool.exe',
-            'connectivity_tool.pdb',
-            )
-          foreach ($name in $cliFiles) {
-            Copy-Item -LiteralPath (Join-Path $releaseDir $name) -Destination $cliRoot -Force
-          }
-
-          $redistSearchRoot = if (-not [string]::IsNullOrWhiteSpace($env:VCToolsRedistDir) -and
-              (Test-Path -LiteralPath $env:VCToolsRedistDir)) {
-            $env:VCToolsRedistDir
-          }
-          else {
-            Join-Path $env:VS_PATH 'VC\Redist\MSVC'
-          }
-          # Microsoft's x64 redistributable also carries the ARM64 runtime.
-          $redistName = 'vc_redist.x64.exe'
-          $redist = Get-ChildItem -LiteralPath $redistSearchRoot -Filter $redistName -File -Recurse |
-            Sort-Object { [version]::new($_.VersionInfo.FileMajorPart, $_.VersionInfo.FileMinorPart, $_.VersionInfo.FileBuildPart, $_.VersionInfo.FilePrivatePart) } -Descending |
-            Select-Object -First 1
-          if (-not $redist) {
-            throw "$redistName was not found below $redistSearchRoot"
-          }
-          $redistSignature = Get-AuthenticodeSignature -LiteralPath $redist.FullName
-          if ($redistSignature.Status -ne 'Valid' -or
-              $redistSignature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') {
-            throw "$redistName does not have the expected valid Microsoft signature"
-          }
-          Copy-Item -LiteralPath $redist.FullName -Destination $cliRoot -Force
-
-          $licenseRoot = Join-Path $cliRoot 'licenses'
-          New-Item -ItemType Directory -Path $licenseRoot -Force | Out-Null
-          Copy-Item -LiteralPath 'LICENSE' -Destination (Join-Path $cliRoot 'LICENSE.txt') -Force
-          Copy-Item -LiteralPath 'LICENSE' -Destination (Join-Path $licenseRoot 'PDC.txt') -Force
-          Copy-Item -LiteralPath (Join-Path $env:DEPS_DIR 'boost\LICENSE_1_0.txt') `
-            -Destination (Join-Path $licenseRoot 'Boost-1.0.txt') -Force
-          Copy-Item -LiteralPath (Join-Path $env:DEPS_DIR 'openssl\LICENSE.txt') `
-            -Destination (Join-Path $licenseRoot 'OpenSSL.txt') -Force
-
-          $sourceLicenseRoot = Join-Path $licenseRoot 'source-tree'
-          foreach ($scanRoot in @('contrib', 'src\gui\qt-daemon\layout')) {
-            Get-ChildItem -LiteralPath $scanRoot -File -Recurse |
-              Where-Object { $_.Name -match '^(LICENSE|COPYING)(\..*)?$' } |
-              ForEach-Object {
-                $relativePath = [IO.Path]::GetRelativePath($env:GITHUB_WORKSPACE, $_.FullName)
-                $destination = Join-Path $sourceLicenseRoot $relativePath
-                New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
-                Copy-Item -LiteralPath $_.FullName -Destination $destination -Force
-              }
-          }
-
-          @"
-          PDC Windows ARM64 CLI package
-          Network: $env:NETWORK_NAME
-          Version: $env:PACKAGE_VERSION
-          Signing: $env:SIGNING_STATUS
-
-          Programs:
-            pdcd.exe                    full-node daemon
-            simplewallet.exe             CLI wallet and wallet RPC mode
-            connectivity_tool.exe        connectivity diagnostics
-
-          This build uses the Microsoft Visual C++ dynamic runtime. Run
-          $redistName if the required runtime is not already installed.
-          License texts are under licenses\.
-          "@ | Set-Content -LiteralPath (Join-Path $cliRoot 'README-WINDOWS.txt') -Encoding utf8
-
-          @"
-          This distribution contains PDC and third-party components.
-
-          License texts shipped by the project, Boost, and OpenSSL are collected
-          under licenses\. The source-tree subdirectory preserves notices from
-          bundled dependencies.
-          "@ | Set-Content -LiteralPath (Join-Path $cliRoot 'THIRD-PARTY-NOTICES.txt') -Encoding utf8
-
-          @"
-          Source commit: $env:GITHUB_SHA
-          Source ref: $env:GITHUB_REF
-          Configuration: Release
-          Platform: Windows ARM64
-          Toolchain: Visual Studio 2022 / MSVC v143 (x64 to ARM64)
-          Boost: $env:BOOST_VERSION (static libraries, shared CRT)
-          OpenSSL: $env:OPENSSL_VERSION (static libraries, shared CRT)
-          Qt: not included (CLI-only package)
-          Network: $env:NETWORK_NAME
-          Signing: $env:SIGNING_STATUS
-          "@ | Set-Content -LiteralPath (Join-Path $cliRoot 'BUILD-INFO.txt') -Encoding utf8
 
       - name: Install Inno Setup 6
         if: matrix.gui
