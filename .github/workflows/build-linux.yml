@@ -2,19 +2,9 @@ name: PDC Linux GUI
 
 on:
   workflow_dispatch:
-    inputs:
-      testnet:
-        description: 'Build testnet binaries (-DTESTNET=TRUE)'
-        type: boolean
-        default: false
-  # Also callable from build-all.yml, which fans mainnet and testnet
-  # builds out across all three platforms in a single run.
+  # Callable from an umbrella workflow; always builds mainnet.
   workflow_call:
     inputs:
-      testnet:
-        description: 'Build testnet binaries (-DTESTNET=TRUE)'
-        type: boolean
-        default: false
       ref:
         description: 'Commit SHA or ref to build (defaults to the triggering commit)'
         type: string
@@ -34,7 +24,7 @@ env:
 
 jobs:
   build:
-    name: Linux ${{ matrix.arch }} (full)${{ inputs.testnet == true && ' (testnet)' || '' }}
+    name: Linux ${{ matrix.arch }} (mainnet)
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 300
     strategy:
@@ -206,13 +196,11 @@ jobs:
       - name: Configure (CMake, Release ${{ matrix.arch }})
         run: |
           set -euo pipefail
-          testnet=FALSE
-          if [[ "${{ inputs.testnet }}" == true ]]; then testnet=TRUE; fi
 
           cmake -S . -B "$BUILD_DIR" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-            -DTESTNET="$testnet" \
+            -DTESTNET=FALSE \
             -DBUILD_GUI=TRUE \
             -DBUILD_TESTS=FALSE \
             -DUSE_PCH=FALSE \
@@ -273,19 +261,13 @@ jobs:
           fi
 
           package_version="${major}.${minor}.${revision}.${build_no}-${commit}"
-          network_suffix=''
-          network_name=mainnet
-          if [[ "${{ inputs.testnet }}" == true ]]; then
-            network_suffix=-testnet
-            network_name=testnet
-          fi
 
           {
             echo "PACKAGE_VERSION=$package_version"
-            echo "PKG_TAG=${GITHUB_REF_NAME//\//-}${network_suffix}-v${major}.${minor}.${revision}.${build_no}[${commit}]"
-            echo "NETWORK_NAME=$network_name"
-            echo "CLI_BASENAME=pdc-linux-${{ matrix.arch }}-cli${network_suffix}-${package_version}"
-            echo "GUI_BASENAME=pdc-linux-${{ matrix.arch }}-gui${network_suffix}-${package_version}"
+            echo "PKG_TAG=${GITHUB_REF_NAME//\//-}-v${major}.${minor}.${revision}.${build_no}[${commit}]"
+            echo "NETWORK_NAME=mainnet"
+            echo "CLI_BASENAME=pdc-linux-${{ matrix.arch }}-cli-${package_version}"
+            echo "GUI_BASENAME=pdc-linux-${{ matrix.arch }}-gui-${package_version}"
           } >> "$GITHUB_ENV"
 
       - name: Assemble CLI package
