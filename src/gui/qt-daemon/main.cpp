@@ -36,9 +36,10 @@ int main(int argc, char *argv[])
   #ifdef _WIN64
   _set_FMA3_enable(0);
   #endif
-  //mutex to let InnoSetup know about running instance
-  ::CreateMutex(NULL, FALSE, CURRENCY_NAME_BASE "_instance");
-  //::CreateMutex(NULL, FALSE, "Global\\" CURRENCY_NAME_BASE "_instance");
+  // Mutex so Inno Setup can detect a running instance (AppMutex).
+  // Qt/MSVC builds define UNICODE, so CreateMutex maps to CreateMutexW;
+  // keep CreateMutexA for the narrow CURRENCY_NAME_BASE string literal.
+  ::CreateMutexA(NULL, FALSE, CURRENCY_NAME_BASE "_instance");
 #endif
 
 
