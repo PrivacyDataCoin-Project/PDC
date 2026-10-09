@@ -241,7 +241,6 @@ jobs:
           "$BUILD_DIR/src/pdcd" --version
           "$BUILD_DIR/src/simplewallet" --version
           "$BUILD_DIR/src/connectivity_tool" --version
-          "$BUILD_DIR/src/Pdc" --version
 
       - name: Derive package version
         run: |
