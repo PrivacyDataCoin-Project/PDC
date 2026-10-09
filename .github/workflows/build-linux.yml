@@ -549,8 +549,50 @@ jobs:
 
           # plugin-qt may overwrite with Qt's partial NSS; force the complete
           # builder package set into usr/lib so softokn/freebl match libnssutil3.
+          # Dereference package symlinks (absolute targets would escape AppDir)
+          # and set $ORIGIN so NSS/NSPR resolve each other without host libs.
           for library in "${nss_runtime_libraries[@]}"; do
-            cp -a "$library" "$appdir/usr/lib/${library##*/}"
+            dest="$appdir/usr/lib/${library##*/}"
+            cp -L "$library" "$dest"
+            chmod u+w "$dest"
+            if [[ -f "$dest" ]] && file -b "$dest" | grep -q 'ELF .*shared object'; then
+              patchelf --set-rpath '$ORIGIN' "$dest"
+            fi
+          done
+          # Also ship versioned sonames referenced by DT_NEEDED (libplc4.so.0 etc.).
+          mapfile -t nss_versioned_libraries < <(
+            printf '%s\n' "$nss_package_files" |
+              awk -F/ '$NF ~ /^lib.*[.]so[.]/ && !seen[$NF]++ { print }'
+          )
+          for library in "${nss_versioned_libraries[@]}"; do
+            dest="$appdir/usr/lib/${library##*/}"
+            [[ -e "$dest" ]] && continue
+            cp -L "$library" "$dest"
+            chmod u+w "$dest"
+            if [[ -f "$dest" ]] && file -b "$dest" | grep -q 'ELF .*shared object'; then
+              patchelf --set-rpath '$ORIGIN' "$dest"
+            fi
+          done
+          # Ensure GUI binaries prefer AppDir usr/lib for NSS/NSPR after the
+          # force-copy (DT_RUNPATH from linuxdeploy alone can still lose to host).
+          webengine_process=$(find "$appdir" -type f -name QtWebEngineProcess -print -quit)
+          origin_lib='$ORIGIN/../lib'
+          for bin_path in \
+            "$appdir/usr/bin/Pdc" \
+            "$appdir/usr/bin/pdcd" \
+            "$appdir/usr/bin/simplewallet" \
+            "$appdir/usr/bin/connectivity_tool" \
+            "$webengine_process"
+          do
+            [[ -n "$bin_path" && -f "$bin_path" ]] || continue
+            existing_rpath=$(patchelf --print-rpath "$bin_path" 2>/dev/null || true)
+            if [[ ":$existing_rpath:" != *":$origin_lib:"* ]]; then
+              if [[ -n "$existing_rpath" ]]; then
+                patchelf --set-rpath "${origin_lib}:${existing_rpath}" "$bin_path"
+              else
+                patchelf --set-rpath "$origin_lib" "$bin_path"
+              fi
+            fi
           done
 
           # Drop systemd/udev copies that plugin-qt may still pull in, then pack
