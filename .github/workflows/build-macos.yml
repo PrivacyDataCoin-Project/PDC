@@ -200,6 +200,25 @@ jobs:
           bash "$GITHUB_WORKSPACE/utils/macos_codesign.sh" notarize "$RUNNER_TEMP/$CLI_PKG.zip"
           rm -f "$RUNNER_TEMP/$CLI_PKG.zip"
 
+      - name: Write workflow summary
+        env:
+          SIGNED: ${{ steps.signcheck.outputs.sign }}
+        run: |
+          if [ "$SIGNED" = "true" ]; then
+            signing='Developer ID + notarization'
+          else
+            signing='not configured (unsigned)'
+          fi
+          {
+            echo "### macOS ${{ matrix.arch }} CLI build"
+            echo
+            echo "- Network: mainnet"
+            echo "- Deployment target: macOS ${{ matrix.osx_min }}"
+            echo "- CLI: \`$CLI_PKG.tar.bz2\`"
+            echo "- macOS platform signing: $signing"
+            echo "- Release checksums: GitHub shows an artifact digest; no separate checksum artifact is produced"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
@@ -313,6 +332,24 @@ jobs:
           ditto -c -k --keepParent "$PKG" "$RUNNER_TEMP/$PKG.zip"
           bash utils/macos_codesign.sh notarize "$RUNNER_TEMP/$PKG.zip"
           rm -f "$RUNNER_TEMP/$PKG.zip"
+
+      - name: Write workflow summary
+        env:
+          SIGNED: ${{ steps.signcheck.outputs.sign }}
+        run: |
+          if [ "$SIGNED" = "true" ]; then
+            signing='Developer ID + notarization'
+          else
+            signing='not configured (unsigned)'
+          fi
+          {
+            echo "### macOS universal CLI build"
+            echo
+            echo "- Network: mainnet"
+            echo "- CLI: \`$PKG.tar.bz2\`"
+            echo "- macOS platform signing: $signing"
+            echo "- Release checksums: GitHub shows an artifact digest; no separate checksum artifact is produced"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -581,6 +618,25 @@ jobs:
         # indistinguishable from a good one until a user tries to open it.
         run: bash utils/macos_codesign.sh verify-dmg "$PDC_DMG"
 
+      - name: Write workflow summary
+        env:
+          SIGNED: ${{ steps.signcheck.outputs.sign }}
+        run: |
+          if [ "$SIGNED" = "true" ]; then
+            signing='Developer ID + notarization (stapled)'
+          else
+            signing='not configured (ad-hoc / unsigned dmg)'
+          fi
+          {
+            echo "### macOS x64 GUI build"
+            echo
+            echo "- Network: mainnet"
+            echo "- Deployment target: macOS 12.0 (Qt 6.8)"
+            echo "- GUI: \`$(basename "$PDC_DMG")\`"
+            echo "- macOS platform signing: $signing"
+            echo "- Release checksums: GitHub shows an artifact digest; no separate checksum artifact is produced"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
@@ -847,6 +903,25 @@ jobs:
         # accepted by Gatekeeper - a silently unnotarized build is otherwise
         # indistinguishable from a good one until a user tries to open it.
         run: bash utils/macos_codesign.sh verify-dmg "$PDC_DMG"
+
+      - name: Write workflow summary
+        env:
+          SIGNED: ${{ steps.signcheck.outputs.sign }}
+        run: |
+          if [ "$SIGNED" = "true" ]; then
+            signing='Developer ID + notarization (stapled)'
+          else
+            signing='not configured (ad-hoc / unsigned dmg)'
+          fi
+          {
+            echo "### macOS arm64 GUI build"
+            echo
+            echo "- Network: mainnet"
+            echo "- Deployment target: macOS 12.0 (Qt 6.8)"
+            echo "- GUI: \`$(basename "$PDC_DMG")\`"
+            echo "- macOS platform signing: $signing"
+            echo "- Release checksums: GitHub shows an artifact digest; no separate checksum artifact is produced"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
