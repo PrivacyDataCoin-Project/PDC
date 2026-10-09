@@ -3,9 +3,7 @@ name: Build all platforms
 # Fans selected platform workflows into a single run (mainnet only).
 # Platform workflows stay independently dispatchable via workflow_dispatch;
 # this one calls them through workflow_call.
-# When a GitHub Release exists for the tree version (or this run was triggered
-# by release:published), built artifacts are uploaded and the release notes
-# Artifacts section is refreshed.
+# Release assets are published only on release:published — not on push to master.
 
 on:
   push:
@@ -104,7 +102,7 @@ jobs:
     if: >
       always() &&
       !cancelled() &&
-      (github.event_name == 'push' || github.event_name == 'release') &&
+      github.event_name == 'release' &&
       (needs.linux-mainnet.result == 'success' || needs.linux-mainnet.result == 'skipped') &&
       (needs.windows-mainnet.result == 'success' || needs.windows-mainnet.result == 'skipped') &&
       (needs.macos-mainnet.result == 'success' || needs.macos-mainnet.result == 'skipped') &&
@@ -125,28 +123,16 @@ jobs:
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
-          EVENT_NAME: ${{ github.event_name }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           set -euo pipefail
 
-          if [ "$EVENT_NAME" = "release" ] && [ -n "${RELEASE_TAG:-}" ]; then
-            tag="$RELEASE_TAG"
-          else
-            quoted_define() {
-              local name=$1
-              sed -nE "s/^#define[[:space:]]+${name}[[:space:]]+\"([^\"]+)\".*/\\1/p" src/version.h.in
-            }
-            major=$(quoted_define PROJECT_MAJOR_VERSION)
-            minor=$(quoted_define PROJECT_MINOR_VERSION)
-            revision=$(quoted_define PROJECT_REVISION)
-            if [[ -z "$major" || -z "$minor" || -z "$revision" ]]; then
-              echo '::error::Could not read PROJECT_* version from src/version.h.in'
-              exit 1
-            fi
-            tag="v${major}.${minor}.${revision}"
+          if [ -z "${RELEASE_TAG:-}" ]; then
+            echo '::error::release:published event is missing tag_name'
+            exit 1
           fi
 
+          tag="$RELEASE_TAG"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
 
