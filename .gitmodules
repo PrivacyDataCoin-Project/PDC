@@ -1,10 +1,11 @@
 [submodule "contrib/miniupnp"]
 	path = contrib/miniupnp
-	url = https://github.com/miniupnp/miniupnp
+	url = https://github.com/PrivacyDataCoin-Project/miniupnp.git
+	branch = pdc
 [submodule "contrib/tor-connect"]
 	path = contrib/tor-connect
-	url = https://github.com/hyle-team/tor-connect.git
-	branch = main
+	url = https://github.com/PrivacyDataCoin-Project/tor-connect.git
+	branch = pdc
 [submodule "contrib/jwt-cpp"]
 	path = contrib/jwt-cpp
 	url = https://github.com/Thalhammer/jwt-cpp.git
