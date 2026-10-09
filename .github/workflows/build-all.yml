@@ -17,6 +17,10 @@ on:
         description: 'Windows'
         type: boolean
         default: true
+      macos:
+        description: 'macOS'
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -33,13 +37,15 @@ jobs:
           if [ "${{ github.event_name }}" = "push" ]; then
             lin=true
             win=true
+            mac=true
           else
             lin='${{ inputs.linux }}'
             win='${{ inputs.windows }}'
+            mac='${{ inputs.macos }}'
           fi
 
-          if [ "$lin" != "true" ] && [ "$win" != "true" ]; then
-            echo "::error title=No platform selected::Tick at least one of Linux, Windows."
+          if [ "$lin" != "true" ] && [ "$win" != "true" ] && [ "$mac" != "true" ]; then
+            echo "::error title=No platform selected::Tick at least one of Linux, Windows, macOS."
             exit 1
           fi
 
@@ -48,7 +54,7 @@ jobs:
             echo
             echo "| Platform | mainnet |"
             echo "| --- | --- |"
-            for row in "Linux:$lin" "Windows:$win"; do
+            for row in "Linux:$lin" "Windows:$win" "macOS:$mac"; do
               name=${row%%:*}; sel=${row##*:}
               cell=$([ "$sel" = "true" ] && echo 'yes' || echo '-')
               echo "| $name | $cell |"
@@ -75,3 +81,14 @@ jobs:
     permissions:
       contents: read
       id-token: write
+
+  macos-mainnet:
+    name: macOS (mainnet)
+    needs: check-selection
+    if: ${{ !cancelled() && needs.check-selection.result == 'success' && (github.event_name == 'push' || inputs.macos == true) }}
+    uses: ./.github/workflows/build-macos.yml
+    with:
+      ref: ${{ github.sha }}
+    permissions:
+      contents: read
+    secrets: inherit
