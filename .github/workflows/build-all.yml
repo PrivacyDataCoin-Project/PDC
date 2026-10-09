@@ -1,0 +1,56 @@
+name: Build all platforms
+
+# Fans selected platform workflows into a single run (mainnet only).
+# Platform workflows stay independently dispatchable via workflow_dispatch;
+# this one calls them through workflow_call.
+
+on:
+  push:
+    branches: [CI2]
+  workflow_dispatch:
+    inputs:
+      linux:
+        description: 'Linux'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  check-selection:
+    name: Check selection
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: At least one platform must be selected
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "push" ]; then
+            lin=true
+          else
+            lin='${{ inputs.linux }}'
+          fi
+
+          if [ "$lin" != "true" ]; then
+            echo "::error title=No platform selected::Tick at least Linux."
+            exit 1
+          fi
+
+          {
+            echo "### Building mainnet"
+            echo
+            echo "| Platform | mainnet |"
+            echo "| --- | --- |"
+            echo "| Linux | yes |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  linux-mainnet:
+    name: Linux (mainnet)
+    needs: check-selection
+    if: ${{ !cancelled() && needs.check-selection.result == 'success' && (github.event_name == 'push' || inputs.linux == true) }}
+    uses: ./.github/workflows/build-linux.yml
+    with:
+      ref: ${{ github.sha }}
+    permissions:
+      contents: read

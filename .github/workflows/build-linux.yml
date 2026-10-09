@@ -1,10 +1,8 @@
 name: PDC Linux GUI
 
 on:
-  push:
-    branches: [CI2]
   workflow_dispatch:
-  # Callable from an umbrella workflow; always builds mainnet.
+  # Callable from build-all.yml; always builds mainnet.
   workflow_call:
     inputs:
       ref:
