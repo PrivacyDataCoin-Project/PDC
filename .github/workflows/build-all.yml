@@ -221,7 +221,29 @@ jobs:
             gh release delete-asset "$TAG" "$old" --repo "$GITHUB_REPOSITORY" --yes
           done
 
-          gh release upload "$TAG" "${staged[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+          # Upload via the releases assets API (not `gh release upload`): gh filepath-globs
+          # arguments, so names containing [commit] brackets fail with "no matches found".
+          release_id=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq .id)
+          for f in "${staged[@]}"; do
+            name=$(basename -- "$f")
+            existing_id=$(
+              gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}/assets" --paginate \
+                --jq --arg n "$name" '.[] | select(.name == $n) | .id' | head -n1 || true
+            )
+            if [[ -n "${existing_id:-}" ]]; then
+              echo "clobber existing asset: $name ($existing_id)"
+              gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/assets/${existing_id}"
+            fi
+            encoded=$(python3 -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))' "$name")
+            echo "uploading $name"
+            curl -sSLf -X POST \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary @"$f" \
+              "https://uploads.github.com/repos/${GITHUB_REPOSITORY}/releases/${release_id}/assets?name=${encoded}" \
+              >/dev/null
+          done
 
           # Keep the human summary; replace any previous ### Artifacts section.
           existing_body=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq '.body // ""')

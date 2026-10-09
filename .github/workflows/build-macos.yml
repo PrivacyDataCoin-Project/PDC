@@ -171,8 +171,9 @@ jobs:
         run: |
           cd build/src
           version_str=$(./pdcd --version | awk '/^PDC/ { print $2; exit }')
-          suffix=""\n          # Make an unsigned build obvious from the file name alone, so a run
+          # Make an unsigned build obvious from the file name alone, so a run
           # with missing secrets cannot be mistaken for a shippable one.
+          suffix=""
           if [ "$SIGNED" != "true" ]; then suffix="${suffix}-unsigned"; fi
           pkg="pdc-macos-${{ matrix.arch }}-cli${suffix}-${version_str}"
           mkdir "$pkg"
@@ -567,8 +568,9 @@ jobs:
           SIGNED: ${{ steps.signcheck.outputs.sign }}
         run: |
           cd build/src
-          suffix=""\n          # Make an unsigned build obvious from the file name alone, so a run
+          # Make an unsigned build obvious from the file name alone, so a run
           # with missing secrets cannot be mistaken for a shippable one.
+          suffix=""
           if [ "$SIGNED" != "true" ]; then suffix="${suffix}-unsigned"; fi
           dmg="pdc-macos-x64-gui${suffix}-${PDC_VERSION}.dmg"
           rm -f "$dmg"
@@ -853,8 +855,9 @@ jobs:
           SIGNED: ${{ steps.signcheck.outputs.sign }}
         run: |
           cd build/src
-          suffix=""\n          # Make an unsigned build obvious from the file name alone, so a run
+          # Make an unsigned build obvious from the file name alone, so a run
           # with missing secrets cannot be mistaken for a shippable one.
+          suffix=""
           if [ "$SIGNED" != "true" ]; then suffix="${suffix}-unsigned"; fi
           dmg="pdc-macos-arm64-gui${suffix}-${PDC_VERSION}.dmg"
           rm -f "$dmg"
