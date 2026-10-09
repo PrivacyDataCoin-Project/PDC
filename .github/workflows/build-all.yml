@@ -3,10 +3,15 @@ name: Build all platforms
 # Fans selected platform workflows into a single run (mainnet only).
 # Platform workflows stay independently dispatchable via workflow_dispatch;
 # this one calls them through workflow_call.
+# When a GitHub Release exists for the tree version (or this run was triggered
+# by release:published), built artifacts are uploaded and the release notes
+# Artifacts section is refreshed.
 
 on:
   push:
     branches: [master]
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       linux:
@@ -34,14 +39,15 @@ jobs:
       - name: At least one platform must be selected
         run: |
           set -euo pipefail
-          if [ "${{ github.event_name }}" = "push" ]; then
-            lin=true
-            win=true
-            mac=true
-          else
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             lin='${{ inputs.linux }}'
             win='${{ inputs.windows }}'
             mac='${{ inputs.macos }}'
+          else
+            # push to master and release:published build every platform
+            lin=true
+            win=true
+            mac=true
           fi
 
           if [ "$lin" != "true" ] && [ "$win" != "true" ] && [ "$mac" != "true" ]; then
@@ -64,7 +70,7 @@ jobs:
   linux-mainnet:
     name: Linux (mainnet)
     needs: check-selection
-    if: ${{ !cancelled() && needs.check-selection.result == 'success' && (github.event_name == 'push' || inputs.linux == true) }}
+    if: ${{ !cancelled() && needs.check-selection.result == 'success' && (github.event_name != 'workflow_dispatch' || inputs.linux == true) }}
     uses: ./.github/workflows/build-linux.yml
     with:
       ref: ${{ github.sha }}
@@ -74,7 +80,7 @@ jobs:
   windows-mainnet:
     name: Windows (mainnet)
     needs: check-selection
-    if: ${{ !cancelled() && needs.check-selection.result == 'success' && (github.event_name == 'push' || inputs.windows == true) }}
+    if: ${{ !cancelled() && needs.check-selection.result == 'success' && (github.event_name != 'workflow_dispatch' || inputs.windows == true) }}
     uses: ./.github/workflows/build-windows.yml
     with:
       ref: ${{ github.sha }}
@@ -84,10 +90,186 @@ jobs:
   macos-mainnet:
     name: macOS (mainnet)
     needs: check-selection
-    if: ${{ !cancelled() && needs.check-selection.result == 'success' && (github.event_name == 'push' || inputs.macos == true) }}
+    if: ${{ !cancelled() && needs.check-selection.result == 'success' && (github.event_name != 'workflow_dispatch' || inputs.macos == true) }}
     uses: ./.github/workflows/build-macos.yml
     with:
       ref: ${{ github.sha }}
     permissions:
       contents: read
     secrets: inherit
+
+  publish-release:
+    name: Publish release assets
+    needs: [linux-mainnet, windows-mainnet, macos-mainnet]
+    if: >
+      always() &&
+      !cancelled() &&
+      (github.event_name == 'push' || github.event_name == 'release') &&
+      (needs.linux-mainnet.result == 'success' || needs.linux-mainnet.result == 'skipped') &&
+      (needs.windows-mainnet.result == 'success' || needs.windows-mainnet.result == 'skipped') &&
+      (needs.macos-mainnet.result == 'success' || needs.macos-mainnet.result == 'skipped') &&
+      (needs.linux-mainnet.result == 'success' ||
+       needs.windows-mainnet.result == 'success' ||
+       needs.macos-mainnet.result == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Resolve release tag
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT_NAME" = "release" ] && [ -n "${RELEASE_TAG:-}" ]; then
+            tag="$RELEASE_TAG"
+          else
+            quoted_define() {
+              local name=$1
+              sed -nE "s/^#define[[:space:]]+${name}[[:space:]]+\"([^\"]+)\".*/\\1/p" src/version.h.in
+            }
+            major=$(quoted_define PROJECT_MAJOR_VERSION)
+            minor=$(quoted_define PROJECT_MINOR_VERSION)
+            revision=$(quoted_define PROJECT_REVISION)
+            if [[ -z "$major" || -z "$minor" || -z "$revision" ]]; then
+              echo '::error::Could not read PROJECT_* version from src/version.h.in'
+              exit 1
+            fi
+            tag="v${major}.${minor}.${revision}"
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
+          if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "No GitHub Release for tag $tag — skipping asset publish"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+          echo "Publishing artifacts to release $tag"
+
+      - name: Download build artifacts
+        if: steps.release.outputs.publish == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          path: artifacts
+          pattern: pdc-*
+          merge-multiple: true
+
+      - name: Stage release files and update notes
+        if: steps.release.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p release-assets
+          shopt -s nullglob
+
+          find_one() {
+            local pattern=$1
+            local matches=(artifacts/$pattern)
+            if [[ ${#matches[@]} -eq 0 ]]; then
+              return 1
+            fi
+            if [[ ${#matches[@]} -gt 1 ]]; then
+              echo "::warning::Multiple matches for $pattern; using ${matches[0]}"
+            fi
+            printf '%s' "${matches[0]}"
+          }
+
+          stage() {
+            local pattern=$1
+            local dest_name=$2
+            local src
+            if ! src=$(find_one "$pattern"); then
+              echo "skip missing: $pattern -> $dest_name"
+              return 0
+            fi
+            cp -f "$src" "release-assets/$dest_name"
+            echo "staged $dest_name ($(du -h "release-assets/$dest_name" | awk '{print $1}'))"
+          }
+
+          # Prefer release names close to v2.4.0 while covering new multi-arch CI outputs.
+          stage 'pdc-linux-x64-cli-*.tar.bz2'          "Pdc-v${VERSION}-ubuntu-22.04.tar.bz2"
+          stage 'pdc-linux-x64-gui-*.AppImage'         "Pdc-GUI-v${VERSION}-ubuntu-22.04.AppImage"
+          stage 'pdc-linux-arm64-cli-*.tar.bz2'        "Pdc-v${VERSION}-linux-arm64.tar.bz2"
+          stage 'pdc-linux-arm64-gui-*.AppImage'       "Pdc-GUI-v${VERSION}-linux-arm64.AppImage"
+          stage 'pdc-windows-x64-cli-*.zip'            "Pdc-v${VERSION}-windows.zip"
+          stage 'pdc-windows-x64-gui-*.zip'            "Pdc-Gui-v${VERSION}-windows.zip"
+          stage 'pdc-windows-x64-gui-*-installer.exe'  "Pdc-Gui-v${VERSION}-windows.exe"
+          stage 'pdc-macos-universal-cli-*.tar.bz2'    "Pdc-v${VERSION}-osx.tar.bz2"
+          stage 'pdc-macos-arm64-gui-*.dmg'            "Pdc-Gui-v${VERSION}-osx-arm64.dmg"
+          stage 'pdc-macos-x64-gui-*.dmg'              "Pdc-Gui-v${VERSION}-osx-x64.dmg"
+
+          mapfile -t staged < <(find release-assets -type f | sort)
+          if [[ ${#staged[@]} -eq 0 ]]; then
+            echo '::error::No release assets were staged from CI artifacts'
+            find artifacts -type f | sort || true
+            exit 1
+          fi
+
+          gh release upload "$TAG" "${staged[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+
+          # Keep the human summary; replace any previous ### Artifacts section.
+          existing_body=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq '.body // ""')
+          export EXISTING_BODY="$existing_body"
+          python3 - "$VERSION" <<'PY' > release-notes.md
+          import os, sys
+          version = sys.argv[1]
+          body = os.environ.get("EXISTING_BODY", "")
+          lines = body.splitlines()
+          core = []
+          skipping = False
+          for line in lines:
+              if line.startswith("### Artifacts"):
+                  skipping = True
+                  continue
+              if skipping and line.startswith("### "):
+                  skipping = False
+              if not skipping:
+                  core.append(line)
+          while core and core[-1] == "":
+              core.pop()
+          if not core:
+              core = [f"## PDC {version}", ""]
+          print("\n".join(core).rstrip())
+          print()
+          print("### Artifacts")
+          print()
+          sha = os.environ["GITHUB_SHA"][:8]
+          run = os.environ["GITHUB_RUN_ID"]
+          server = os.environ["GITHUB_SERVER_URL"]
+          repo = os.environ["GITHUB_REPOSITORY"]
+          print(f"Built from `{sha}` by [Build all platforms]({server}/{repo}/actions/runs/{run}).")
+          print()
+          PY
+
+          for f in "${staged[@]}"; do
+            name=${f##*/}
+            size=$(du -h "$f" | awk '{print $1}')
+            echo "- \`${name}\` (${size})" >> release-notes.md
+          done
+
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file release-notes.md
+
+          {
+            echo "### Published to \`$TAG\`"
+            echo
+            for f in "${staged[@]}"; do
+              echo "- \`${f##*/}\`"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
