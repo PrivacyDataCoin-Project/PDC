@@ -10,6 +10,11 @@ if [ -d "${script_dir}/apprun-hooks" ]; then
   done
 fi
 
+# Drop LD_LIBRARY_PATH from apprun-hooks. ELF RPATHs already point at AppDir Qt
+# libs; keeping LD_LIBRARY_PATH forces Chromium onto any leftover AppDir
+# libnssutil3/libsystemd and crashes on newer hosts (NSSUTIL_3.108 / LIBSYSTEMD_254).
+unset LD_LIBRARY_PATH
+
 parse_manual_binary_arguments()
 {
   local input="$1"

@@ -21,6 +21,7 @@ env:
   QT_VERSION: 6.8.3
   LINUXDEPLOY_VERSION: 1-alpha-20251107-1
   LINUXDEPLOY_QT_VERSION: 1-alpha-20250213-1
+  APPIMAGETOOL_VERSION: '1.9.1'
 
 jobs:
   build:
@@ -43,6 +44,7 @@ jobs:
             baseline: Ubuntu 22.04 / glibc 2.35
             linuxdeploy_sha256: c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d
             linuxdeploy_qt_sha256: 15106be885c1c48a021198e7e1e9a48ce9d02a86dd0a1848f00bdbf3c1c92724
+            appimagetool_sha256: ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0
           - arch: arm64
             runner: ubuntu-24.04-arm
             cmake_arch: default
@@ -55,6 +57,7 @@ jobs:
             baseline: Ubuntu 24.04 / glibc 2.39
             linuxdeploy_sha256: 620095110d693282b8ebeb244a95b5e911cf8f65f76c88b4b47d16ae6346fcff
             linuxdeploy_qt_sha256: bf1c24aff6d749b5cf423afad6f15abd4440f81dec1aab95706b25f6667cdcf1
+            appimagetool_sha256: f0837e7448a0c1e4e650a93bb3e85802546e60654ef287576f46c71c126a9158
     env:
       DEPS_DIR: ${{ github.workspace }}/_deps-linux
       BUILD_DIR: ${{ github.workspace }}/build-linux
@@ -341,6 +344,7 @@ jobs:
           mkdir -p "$TOOLS_DIR"
           linuxdeploy="$TOOLS_DIR/linuxdeploy-${{ matrix.appimage_arch }}.AppImage"
           qt_plugin="$TOOLS_DIR/linuxdeploy-plugin-qt-${{ matrix.appimage_arch }}.AppImage"
+          appimagetool="$TOOLS_DIR/appimagetool-${{ matrix.appimage_arch }}.AppImage"
 
           curl --fail --location --retry 3 --output "$linuxdeploy" \
             "https://github.com/linuxdeploy/linuxdeploy/releases/download/${LINUXDEPLOY_VERSION}/linuxdeploy-${{ matrix.appimage_arch }}.AppImage"
@@ -349,7 +353,11 @@ jobs:
           curl --fail --location --retry 3 --output "$qt_plugin" \
             "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/${LINUXDEPLOY_QT_VERSION}/linuxdeploy-plugin-qt-${{ matrix.appimage_arch }}.AppImage"
           echo "${{ matrix.linuxdeploy_qt_sha256 }}  $qt_plugin" | sha256sum --check --strict
-          chmod 0755 "$linuxdeploy" "$qt_plugin"
+
+          curl --fail --location --retry 3 --output "$appimagetool" \
+            "https://github.com/AppImage/appimagetool/releases/download/${APPIMAGETOOL_VERSION}/appimagetool-${{ matrix.appimage_arch }}.AppImage"
+          echo "${{ matrix.appimagetool_sha256 }}  $appimagetool" | sha256sum --check --strict
+          chmod 0755 "$linuxdeploy" "$qt_plugin" "$appimagetool"
 
       - name: Assemble Qt 6 GUI AppImage
         env:
@@ -486,8 +494,9 @@ jobs:
               awk '$1 ~ /^libevent-2[.]1[.]so[.]/ || $1 ~ /^libminizip[.]so[.]/ { print $1 }'
           )
 
-          # Keep glibc/systemd/NSS/X11 on the host. Bundling Ubuntu 22.04 copies of
-          # these breaks newer hosts (e.g. 26.04 needs LIBSYSTEMD_254 / NSSUTIL_3.108).
+          # Keep glibc/systemd/NSS/X11 on the host. Qt WebEngine's aqt kit ships
+          # partial NSS; mixing that with a newer host softokn3 (Ubuntu 26.04)
+          # fatals Chromium. systemd from 22.04 similarly breaks host tools.
           host_lib_excludes=(
             'libsystemd.so*'
             'libudev.so*'
@@ -532,26 +541,55 @@ jobs:
             --plugin qt \
             "${exclude_args[@]}"
 
-          # Belt-and-suspenders: plugin-qt may still copy some of the above.
-          while IFS= read -r -d '' stale; do
-            rm -f "$stale"
-          done < <(
-            find "$appdir" \( -type f -o -type l \) \( \
-              -name 'libsystemd.so*' -o -name 'libudev.so*' -o \
-              -name 'libnss3.so*' -o -name 'libnssutil3.so*' -o \
-              -name 'libnspr4.so*' -o -name 'libplc4.so*' -o -name 'libplds4.so*' -o \
-              -name 'libsmime3.so*' -o -name 'libssl3.so*' -o \
-              -name 'libfreebl3.so*' -o -name 'libfreeblpriv3.so*' -o \
-              -name 'libsoftokn3.so*' -o -name 'libnssckbi.so*' \
-            \) -print0
-          )
-          rm -rf "$appdir/usr/lib/nss"
+          # plugin-qt copies Qt's private NSS regardless of --exclude-library.
+          # Remove host-owned libs, then package with appimagetool (do NOT re-run
+          # linuxdeploy --output, which can redeploy the same Qt NSS copies).
+          prune_host_libs() {
+            local root=$1
+            while IFS= read -r -d '' stale; do
+              rm -f "$stale"
+            done < <(
+              find "$root" \( -type f -o -type l \) \( \
+                -name 'libsystemd.so*' -o -name 'libudev.so*' -o \
+                -name 'libnss3.so*' -o -name 'libnssutil3.so*' -o \
+                -name 'libnspr4.so*' -o -name 'libplc4.so*' -o -name 'libplds4.so*' -o \
+                -name 'libsmime3.so*' -o -name 'libssl3.so*' -o \
+                -name 'libfreebl3.so*' -o -name 'libfreeblpriv3.so*' -o \
+                -name 'libsoftokn3.so*' -o -name 'libnssckbi.so*' \
+              \) -print0
+            )
+            rm -rf "$root/usr/lib/nss" "$root/usr/lib/x86_64-linux-gnu/nss" \
+              "$root/usr/lib/aarch64-linux-gnu/nss"
+          }
+          prune_host_libs "$appdir"
 
-          "$linuxdeploy" \
-            --appdir "$appdir" \
-            --output appimage
+          if find "$appdir" \( -name 'libnssutil3.so*' -o -name 'libnss3.so*' -o -name 'libsystemd.so*' \) | grep -q .; then
+            echo '::error::AppDir still contains host NSS/systemd libraries after prune'
+            find "$appdir" \( -name 'libnssutil3.so*' -o -name 'libnss3.so*' -o -name 'libsystemd.so*' \) -print
+            exit 1
+          fi
+
+          appimagetool="$TOOLS_DIR/appimagetool-${{ matrix.appimage_arch }}.AppImage"
+          export APPIMAGE_EXTRACT_AND_RUN=1
+          export ARCH="${{ matrix.appimage_arch }}"
+          "$appimagetool" --no-appstream "$appdir" "$OUTPUT"
 
           test -x "$OUTPUT"
+
+          # Verify the packed image, not just the AppDir (guards against packager
+          # re-injection of Qt NSS).
+          extract_root="$RUNNER_TEMP/appimage-extract-check"
+          rm -rf "$extract_root"
+          mkdir -p "$extract_root"
+          pushd "$extract_root" >/dev/null
+          "$OUTPUT" --appimage-extract >/dev/null
+          popd >/dev/null
+          if find "$extract_root/squashfs-root" \( -name 'libnssutil3.so*' -o -name 'libnss3.so*' -o -name 'libsystemd.so*' \) | grep -q .; then
+            echo '::error::Packed AppImage still contains host NSS/systemd libraries'
+            find "$extract_root/squashfs-root" \( -name 'libnssutil3.so*' -o -name 'libnss3.so*' -o -name 'libsystemd.so*' \) -print
+            exit 1
+          fi
+          rm -rf "$extract_root"
           file "$OUTPUT"
           readelf -h "$OUTPUT" | grep -F "Machine:" | grep -F "${{ matrix.elf_machine }}"
           test -x "$appdir/AppRun"
