@@ -494,26 +494,31 @@ jobs:
               awk '$1 ~ /^libevent-2[.]1[.]so[.]/ || $1 ~ /^libminizip[.]so[.]/ { print $1 }'
           )
 
-          # Keep glibc/systemd/NSS/X11 on the host. Qt WebEngine's aqt kit ships
-          # partial NSS; mixing that with a newer host softokn3 (Ubuntu 26.04)
-          # fatals Chromium. systemd from 22.04 similarly breaks host tools.
+          # NSS loads softokn/freebl/dbm modules dynamically, so ldd alone misses
+          # them. Qt WebEngine's aqt kit ships a partial NSS set; mixing that with
+          # a newer host softokn3 (Ubuntu 26.04 / hyle-team/zano#762) fatals
+          # Chromium. Port of zano#767 (3ecb02db): bundle the complete native
+          # NSS/NSPR library set from the builder, including package aliases once.
+          native_arch=$(dpkg --print-architecture)
+          nss_package_files=$(dpkg-query -L "libnss3:$native_arch" "libnspr4:$native_arch")
+          mapfile -t nss_runtime_libraries < <(
+            printf '%s\n' "$nss_package_files" |
+              awk -F/ '$NF ~ /^lib.*[.]so$/ && !seen[$NF]++ { print }'
+          )
+          test "${#nss_runtime_libraries[@]}" -gt 0
+          nss_library_args=()
+          for library in "${nss_runtime_libraries[@]}"; do
+            nss_library_args+=(--library "$library")
+          done
+
+          # Keep systemd/GL/X11 on the host. systemd from the 22.04 builder
+          # breaks newer host tools (LIBSYSTEMD_254); GL/X11 belong to the GPU stack.
           host_lib_excludes=(
             'libsystemd.so*'
             'libudev.so*'
             'libselinux.so*'
             'libmount.so*'
             'libblkid.so*'
-            'libnss3.so*'
-            'libnssutil3.so*'
-            'libnspr4.so*'
-            'libplc4.so*'
-            'libplds4.so*'
-            'libsmime3.so*'
-            'libssl3.so*'
-            'libfreebl3.so*'
-            'libfreeblpriv3.so*'
-            'libsoftokn3.so*'
-            'libnssckbi.so*'
             'libGL.so*'
             'libGLdispatch.so*'
             'libGLX.so*'
@@ -531,6 +536,7 @@ jobs:
 
           "$linuxdeploy" \
             --appdir "$appdir" \
+            "${nss_library_args[@]}" \
             --executable "$appdir/usr/bin/Pdc" \
             --executable "$appdir/usr/bin/pdcd" \
             --executable "$appdir/usr/bin/simplewallet" \
@@ -541,33 +547,41 @@ jobs:
             --plugin qt \
             "${exclude_args[@]}"
 
-          # plugin-qt copies Qt's private NSS regardless of --exclude-library.
-          # Remove host-owned libs, then package with appimagetool (do NOT re-run
-          # linuxdeploy --output, which can redeploy the same Qt NSS copies).
+          # plugin-qt may overwrite with Qt's partial NSS; force the complete
+          # builder package set into usr/lib so softokn/freebl match libnssutil3.
+          for library in "${nss_runtime_libraries[@]}"; do
+            cp -a "$library" "$appdir/usr/lib/${library##*/}"
+          done
+
+          # Drop systemd/udev copies that plugin-qt may still pull in, then pack
+          # with appimagetool (avoid linuxdeploy --output redeploying stale libs).
           prune_host_libs() {
             local root=$1
             while IFS= read -r -d '' stale; do
               rm -f "$stale"
             done < <(
               find "$root" \( -type f -o -type l \) \( \
-                -name 'libsystemd.so*' -o -name 'libudev.so*' -o \
-                -name 'libnss3.so*' -o -name 'libnssutil3.so*' -o \
-                -name 'libnspr4.so*' -o -name 'libplc4.so*' -o -name 'libplds4.so*' -o \
-                -name 'libsmime3.so*' -o -name 'libssl3.so*' -o \
-                -name 'libfreebl3.so*' -o -name 'libfreeblpriv3.so*' -o \
-                -name 'libsoftokn3.so*' -o -name 'libnssckbi.so*' \
+                -name 'libsystemd.so*' -o -name 'libudev.so*' \
               \) -print0
             )
-            rm -rf "$root/usr/lib/nss" "$root/usr/lib/x86_64-linux-gnu/nss" \
-              "$root/usr/lib/aarch64-linux-gnu/nss"
           }
           prune_host_libs "$appdir"
 
-          if find "$appdir" \( -name 'libnssutil3.so*' -o -name 'libnss3.so*' -o -name 'libsystemd.so*' \) | grep -q .; then
-            echo '::error::AppDir still contains host NSS/systemd libraries after prune'
-            find "$appdir" \( -name 'libnssutil3.so*' -o -name 'libnss3.so*' -o -name 'libsystemd.so*' \) -print
+          if find "$appdir" \( -name 'libsystemd.so*' -o -name 'libudev.so*' \) | grep -q .; then
+            echo '::error::AppDir still contains host systemd/udev libraries after prune'
+            find "$appdir" \( -name 'libsystemd.so*' -o -name 'libudev.so*' \) -print
             exit 1
           fi
+
+          nss_runtime_files=()
+          for library in "${nss_runtime_libraries[@]}"; do
+            bundled_library="$appdir/usr/lib/${library##*/}"
+            if [[ ! -f "$bundled_library" ]]; then
+              echo "::error::NSS/NSPR library ${library##*/} was not bundled in the AppDir"
+              exit 1
+            fi
+            nss_runtime_files+=("$bundled_library")
+          done
 
           appimagetool="$TOOLS_DIR/appimagetool-${{ matrix.appimage_arch }}.AppImage"
           export APPIMAGE_EXTRACT_AND_RUN=1
@@ -576,19 +590,25 @@ jobs:
 
           test -x "$OUTPUT"
 
-          # Verify the packed image, not just the AppDir (guards against packager
-          # re-injection of Qt NSS).
+          # Verify the packed image still has the complete NSS set and no systemd.
           extract_root="$RUNNER_TEMP/appimage-extract-check"
           rm -rf "$extract_root"
           mkdir -p "$extract_root"
           pushd "$extract_root" >/dev/null
           "$OUTPUT" --appimage-extract >/dev/null
           popd >/dev/null
-          if find "$extract_root/squashfs-root" \( -name 'libnssutil3.so*' -o -name 'libnss3.so*' -o -name 'libsystemd.so*' \) | grep -q .; then
-            echo '::error::Packed AppImage still contains host NSS/systemd libraries'
-            find "$extract_root/squashfs-root" \( -name 'libnssutil3.so*' -o -name 'libnss3.so*' -o -name 'libsystemd.so*' \) -print
+          if find "$extract_root/squashfs-root" \( -name 'libsystemd.so*' -o -name 'libudev.so*' \) | grep -q .; then
+            echo '::error::Packed AppImage still contains host systemd/udev libraries'
+            find "$extract_root/squashfs-root" \( -name 'libsystemd.so*' -o -name 'libudev.so*' \) -print
             exit 1
           fi
+          for library in "${nss_runtime_libraries[@]}"; do
+            soname=${library##*/}
+            if ! find "$extract_root/squashfs-root" -name "$soname" -print -quit | grep -q .; then
+              echo "::error::Packed AppImage is missing NSS/NSPR library $soname"
+              exit 1
+            fi
+          done
           rm -rf "$extract_root"
           file "$OUTPUT"
           readelf -h "$OUTPUT" | grep -F "Machine:" | grep -F "${{ matrix.elf_machine }}"
@@ -618,11 +638,20 @@ jobs:
               exit 1
             fi
           done
-          for runtime_file in "$webengine_process" "$xcb_plugin"; do
-            if ldd "$runtime_file" | grep -F 'not found'; then
+          for runtime_file in "$appdir/usr/bin/Pdc" "$webengine_process" "$xcb_plugin" "${nss_runtime_files[@]}"; do
+            runtime_ldd=$(ldd "$runtime_file")
+            if printf '%s\n' "$runtime_ldd" | grep -F 'not found'; then
               echo "::error::$runtime_file has unresolved shared-library dependencies"
               exit 1
             fi
+            for library in "${nss_runtime_libraries[@]}"; do
+              soname=${library##*/}
+              if printf '%s\n' "$runtime_ldd" | grep -F "$soname => " >/dev/null &&
+                 ! printf '%s\n' "$runtime_ldd" | grep -F "$soname => $appdir/" >/dev/null; then
+                echo "::error::$runtime_file resolves NSS/NSPR library $soname outside the AppDir"
+                exit 1
+              fi
+            done
           done
           for binary in Pdc pdcd simplewallet connectivity_tool; do
             if ldd "$appdir/usr/bin/$binary" | grep -F 'not found'; then

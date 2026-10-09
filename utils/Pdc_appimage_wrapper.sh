@@ -10,10 +10,8 @@ if [ -d "${script_dir}/apprun-hooks" ]; then
   done
 fi
 
-# Drop LD_LIBRARY_PATH from apprun-hooks. ELF RPATHs already point at AppDir Qt
-# libs; keeping LD_LIBRARY_PATH forces Chromium onto any leftover AppDir
-# libnssutil3/libsystemd and crashes on newer hosts (NSSUTIL_3.108 / LIBSYSTEMD_254).
-unset LD_LIBRARY_PATH
+# Keep LD_LIBRARY_PATH from apprun-hooks so the complete builder NSS/NSPR set
+# (zano#767 / Ubuntu 26.04 AppImage fix) resolves ahead of any host softokn.
 
 parse_manual_binary_arguments()
 {
