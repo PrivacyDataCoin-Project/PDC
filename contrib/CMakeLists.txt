@@ -2,17 +2,9 @@ set(UPNPC_BUILD_STATIC ON CACHE BOOL "Build static library")
 set(UPNPC_BUILD_SHARED OFF CACHE BOOL "Build shared library")
 set(UPNPC_BUILD_TESTS OFF CACHE BOOL "Build test executables")
 
-# Apply in-tree warning/security fixes over vendored submodules (no upstream fork required).
-file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/pdc-fixes/randomx/"
-     DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/randomx/")
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/miniupnp/miniupnpc")
-  file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/pdc-fixes/miniupnp/"
-       DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/miniupnp/")
-endif()
-if(NOT DISABLE_TOR AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tor-connect/torlib")
-  file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/pdc-fixes/tor-connect/"
-       DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/tor-connect/")
-endif()
+# Warning/security fixes live in the PrivacyDataCoin-Project submodule forks
+# (see contrib/pdc-fixes/README.md). Do not file(COPY) into submodule trees —
+# that dirties the working tree and makes git describe append -dirty.
 
 add_subdirectory(zlib)
 add_subdirectory(db)
