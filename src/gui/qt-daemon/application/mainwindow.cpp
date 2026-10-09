@@ -73,6 +73,7 @@ QString make_response_dbg(const T& r, const std::string& location)
   }
 
 #include "mainwindow.h"
+#include "web_channel_bridge.h"
 
 namespace
 {
@@ -118,6 +119,7 @@ MainWindow::MainWindow()
   , m_system_shutdown(false)
   , m_view(nullptr)
   , m_channel(nullptr)
+  , m_web_channel_bridge(nullptr)
   , m_ui_dispatch_id_counter(0)
 {
 #ifndef _MSC_VER
@@ -136,7 +138,11 @@ MainWindow::~MainWindow()
   }
   if (m_channel)
   {
-    m_channel->deregisterObject(this);
+    if (m_web_channel_bridge)
+    {
+      m_channel->deregisterObject(m_web_channel_bridge);
+    }
+    m_web_channel_bridge = nullptr;
     delete m_channel;
     m_channel = nullptr;
   }
@@ -182,6 +188,8 @@ bool MainWindow::init_window()
   m_view = new QWebEngineView(this);
   m_view->setPage(new LoggingWebEnginePage(m_view));
   m_channel = new QWebChannel(m_view->page());
+  m_web_channel_bridge = new WebChannelBridge(*this, m_channel);
+  m_channel->registerObject(QStringLiteral("mediator_object"), m_web_channel_bridge);
   m_view->page()->setWebChannel(m_channel);
 
   QWidget* central_widget_to_be_set = m_view;
@@ -222,9 +230,6 @@ bool MainWindow::init_window()
     LOG_ERROR("Qt Dev Tool is not available for this Qt version, try building with Qt 5.11.0 or higher");
 #endif
   }
-
-  // register QObjects to be exposed to JavaScript
-  m_channel->registerObject(QStringLiteral("mediator_object"), this);
 
   connect(m_view, SIGNAL(loadFinished(bool)), SLOT(on_load_finished(bool)));
 

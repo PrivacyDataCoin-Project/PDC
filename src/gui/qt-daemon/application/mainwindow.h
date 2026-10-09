@@ -29,26 +29,8 @@ QT_END_NAMESPACE
 #define  APP_DATA_FILE_BINARY_SIGNATURE   0x1000111101101021LL
 
 
-// class MediatorObject : public QObject
-// {
-//   Q_OBJECT
-// 
-// public:
-// 
-// signals :
-//   /*!
-//   This signal is emitted from the C++ side and the text displayed on the HTML client side.
-//   */
-//   void from_c_to_html(const QString &text);
-// 
-//   public slots:
-//         /*!
-//         This slot is invoked from the HTML client side and the text displayed on the server side.
-//         */
-//   void from_html_to_c(const QString &text);
-// };
+class WebChannelBridge;
 
-//
 class MainWindow : public QMainWindow, 
                    public currency::i_core_event_handler,
                    public view::i_view, 
@@ -275,10 +257,10 @@ private:
   std::string get_wallet_log_prefix(size_t wallet_id) const { return m_backend.get_wallet_log_prefix(wallet_id); }
 
 
-  //MediatorObject mo;
   // UI
   QWebEngineView *m_view;
   QWebChannel* m_channel;
+  WebChannelBridge* m_web_channel_bridge; // owned by m_channel
 
   // DATA
   wallets_manager m_backend;
