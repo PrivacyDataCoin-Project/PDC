@@ -384,11 +384,46 @@ QString MainWindow::get_options(const QString& param)
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
+void MainWindow::emit_mediator_signal(const char* signal_name, const QString& arg)
+{
+  QObject* target = m_web_channel_bridge
+    ? static_cast<QObject*>(m_web_channel_bridge)
+    : static_cast<QObject*>(this);
+  const bool ok = QMetaObject::invokeMethod(target, signal_name, Qt::QueuedConnection,
+    Q_ARG(QString, arg));
+  if (!ok)
+  {
+    LOG_ERROR("Failed to emit mediator signal '" << signal_name << "'");
+  }
+}
+
+void MainWindow::emit_mediator_signal(const char* signal_name, const QString& arg1, const QString& arg2)
+{
+  QObject* target = m_web_channel_bridge
+    ? static_cast<QObject*>(m_web_channel_bridge)
+    : static_cast<QObject*>(this);
+  const bool ok = QMetaObject::invokeMethod(target, signal_name, Qt::QueuedConnection,
+    Q_ARG(QString, arg1), Q_ARG(QString, arg2));
+  if (!ok)
+  {
+    LOG_ERROR("Failed to emit mediator signal '" << signal_name << "' (2 args)");
+  }
+}
+
+void MainWindow::replay_last_daemon_state()
+{
+  if (m_last_daemon_status_for_ui.isEmpty())
+    return;
+  m_last_update_daemon_status_json.clear();
+  LOG_PRINT_L0("SENDING SIGNAL -> [update_daemon_state] (replay)");
+  emit_mediator_signal("update_daemon_state", m_last_daemon_status_for_ui);
+}
+
 void MainWindow::tray_quit_requested(const QString& param)
 {
   TRY_ENTRY();
   LOG_PRINT_MAGENTA("[GUI]->[HTML] tray_quit_requested", LOG_LEVEL_0);  
-  emit quit_requested("{}");
+  emit_mediator_signal("quit_requested", QStringLiteral("{}"));
   CATCH_ENTRY2(void());
 }
 
@@ -418,7 +453,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
      event->ignore();
      //m_quit_requested = true;
      LOG_PRINT_L0("[GUI]->[HTML] quit_requested");
-     emit quit_requested("{}");
+     emit_mediator_signal("quit_requested", QStringLiteral("{}"));
    }
    CATCH_ENTRY2(void());
 }
@@ -825,14 +860,14 @@ bool MainWindow::update_daemon_status(const view::daemon_status_info& info)
   //this->update_daemon_state(info);
   std::string json_str;
   epee::serialization::store_t_to_json(info, json_str);
+  m_last_daemon_status_for_ui = QString::fromStdString(json_str);
 
   //lifehack
   if (m_last_update_daemon_status_json == json_str)
     return true;
 
   LOG_PRINT_L0("SENDING SIGNAL -> [update_daemon_state] " << info.daemon_network_state);
-  //this->update_daemon_state(json_str.c_str());
-  QMetaObject::invokeMethod(this, "update_daemon_state", Qt::QueuedConnection, Q_ARG(QString, json_str.c_str()));
+  emit_mediator_signal("update_daemon_state", m_last_daemon_status_for_ui);
   m_last_update_daemon_status_json = json_str;
   return true;
   CATCH_ENTRY2(false);
@@ -957,7 +992,7 @@ bool MainWindow::handle_ipc_event(const std::string& arguments)
   std::string zzz = std::string("Received IPC: ") + arguments.c_str();
   std::cout << zzz;//message_box(zzz.c_str());
 
-  handle_deeplink_click(arguments.c_str());
+  emit_mediator_signal("handle_deeplink_click", QString::fromStdString(arguments));
 
   return true;
 }
@@ -1037,12 +1072,22 @@ QString MainWindow::start_backend(const QString& params)
   TRY_ENTRY();
   view::api_response ar = AUTO_VAL_INIT(ar);
 
-  bool r = m_backend.start();
-  if (!r)
-  {
-    ar.error_code = API_RETURN_CODE_INTERNAL_ERROR;
-    return MAKE_RESPONSE(ar);
-  }
+  // Defer worker start so WebChannel .connect() registrations from the same
+  // JS turn are applied before the first update_daemon_state is emitted.
+  // Otherwise the first status can be lost and identical follow-ups are
+  // suppressed by the update_daemon_status dedup lifehack — GUI stuck on
+  // "Loading blockchain data".
+  QTimer::singleShot(0, this, [this]() {
+    if (!m_backend.start())
+    {
+      LOG_ERROR("Deferred backend start failed");
+      return;
+    }
+    QTimer::singleShot(0, this, [this]() {
+      replay_last_daemon_state();
+    });
+  });
+
   ar.error_code = API_RETURN_CODE_OK;
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
@@ -1097,7 +1142,8 @@ QString MainWindow::async_call(const QString& func_name, const QString& params)
   auto async_callback = [this, method_name, argements, job_id]()
   {
     QString res_str = this->sync_call(method_name, argements);
-    this->dispatch_async_call_result(std::to_string(job_id).c_str(), res_str);  //general function
+    emit_mediator_signal("dispatch_async_call_result",
+      QString::number(job_id), res_str);
   };
 
   m_threads_pool.add_job(async_callback);
@@ -1117,7 +1163,8 @@ QString MainWindow::async_call_2a(const QString& func_name, const QString& param
   auto async_callback = [this, method_name, argements1, argements2, job_id]()
     {
       QString res_str = this->sync_call_2a(method_name, argements1, argements2);
-      this->dispatch_async_call_result(std::to_string(job_id).c_str(), res_str);  //general function
+      emit_mediator_signal("dispatch_async_call_result",
+        QString::number(job_id), res_str);
     };
 
   m_threads_pool.add_job(async_callback);
@@ -1136,7 +1183,7 @@ bool MainWindow::update_wallet_status(const view::wallet_status_info& wsi)
   
   std::string json_str;
   epee::serialization::store_t_to_json(wsi, json_str, 0);
-  QMetaObject::invokeMethod(this, "update_wallet_status", Qt::QueuedConnection, Q_ARG(QString, json_str.c_str()));
+  emit_mediator_signal("update_wallet_status", QString::fromStdString(json_str));
   return true;
   CATCH_ENTRY2(false);
 }
@@ -1147,7 +1194,7 @@ bool MainWindow::set_options(const view::gui_options& opt)
   std::string json_str;
   epee::serialization::store_t_to_json(opt, json_str, 0);
   LOG_PRINT_L0("SENDING SIGNAL -> [set_options]:" << std::endl << json_str);
-  QMetaObject::invokeMethod(this, "set_options", Qt::QueuedConnection, Q_ARG(QString, json_str.c_str()));
+  emit_mediator_signal("set_options", QString::fromStdString(json_str));
   return true;
   CATCH_ENTRY2(false);
 }
@@ -1158,7 +1205,7 @@ bool MainWindow::update_tor_status(const view::current_action_status& opt)
   std::string json_str;
   epee::serialization::store_t_to_json(opt, json_str, 0);
   LOG_PRINT_L0("SENDING SIGNAL -> [HANDLE_CURRENT_ACTION_STATE]:" << std::endl << json_str);
-  QMetaObject::invokeMethod(this, "handle_current_action_state", Qt::QueuedConnection, Q_ARG(QString, json_str.c_str()));
+  emit_mediator_signal("handle_current_action_state", QString::fromStdString(json_str));
   return true;
   CATCH_ENTRY2(false);
 }
@@ -1207,9 +1254,9 @@ bool MainWindow::update_wallets_info(const view::wallets_summary_info& wsi)
   TRY_ENTRY();
   std::string json_str;
   epee::serialization::store_t_to_json(wsi, json_str, 0);
-  LOG_PRINT_L0("SENDING SIGNAL -> [update_wallets_info]"<< std::endl << json_str );
+  LOG_PRINT_L0("SENDING SIGNAL -> [update_wallet_info]"<< std::endl << json_str );
   
-  QMetaObject::invokeMethod(this, "update_wallets_info", Qt::QueuedConnection, Q_ARG(QString, json_str.c_str()));
+  emit_mediator_signal("update_wallet_info", QString::fromStdString(json_str));
   return true;
   CATCH_ENTRY2(false);
 }
@@ -1221,8 +1268,7 @@ bool MainWindow::money_transfer(const view::transfer_event_info& tei)
   epee::serialization::store_t_to_json(tei, json_str, 0);
 
   LOG_PRINT_L0(get_wallet_log_prefix(tei.wallet_id) + "SENDING SIGNAL -> [money_transfer]" << std::endl << json_str);
-  //this->money_transfer(json_str.c_str());
-  QMetaObject::invokeMethod(this, "money_transfer", Qt::QueuedConnection, Q_ARG(QString, json_str.c_str()));
+  emit_mediator_signal("money_transfer", QString::fromStdString(json_str));
   if (m_config.disable_notifications)
     return true;
 
@@ -1276,8 +1322,7 @@ bool MainWindow::money_transfer_cancel(const view::transfer_event_info& tei)
   epee::serialization::store_t_to_json(tei, json_str, 0);
 
   LOG_PRINT_L0(get_wallet_log_prefix(tei.wallet_id) + "SENDING SIGNAL -> [money_transfer_cancel]");
-  //this->money_transfer_cancel(json_str.c_str());
-  QMetaObject::invokeMethod(this, "money_transfer_cancel", Qt::QueuedConnection, Q_ARG(QString, json_str.c_str()));
+  emit_mediator_signal("money_transfer_cancel", QString::fromStdString(json_str));
 
   return true;
 
@@ -1287,8 +1332,8 @@ bool MainWindow::wallet_sync_progress(const view::wallet_sync_progres_param& p)
 {
   TRY_ENTRY();
   LOG_PRINT_L2(get_wallet_log_prefix(p.wallet_id) + "SENDING SIGNAL -> [wallet_sync_progress]" << " wallet_id: " << p.wallet_id << ": " << p.progress << "%");
-  //this->wallet_sync_progress(epee::serialization::store_t_to_json(p).c_str());
-  QMetaObject::invokeMethod(this, "wallet_sync_progress", Qt::QueuedConnection, Q_ARG(QString, epee::serialization::store_t_to_json(p, 0).c_str()));
+  emit_mediator_signal("wallet_sync_progress",
+    QString::fromStdString(epee::serialization::store_t_to_json(p, 0)));
   return true;
   CATCH_ENTRY2(false);
 }
@@ -1314,8 +1359,7 @@ bool MainWindow::pos_block_found(const currency::block& block_found)
   std::stringstream ss;
   ss << "Found Block h = " << currency::get_block_height(block_found);
   LOG_PRINT_L0("SENDING SIGNAL -> [update_pos_mining_text]");
-  //this->update_pos_mining_text(ss.str().c_str());
-  QMetaObject::invokeMethod(this, "update_pos_mining_text", Qt::QueuedConnection, Q_ARG(QString, ss.str().c_str()));
+  emit_mediator_signal("update_pos_mining_text", QString::fromStdString(ss.str()));
   return true;
   CATCH_ENTRY2(false);
 }
@@ -1526,9 +1570,7 @@ void MainWindow::on_complete_events()
     TIME_MEASURE_FINISH_MS(json_buff_generate_time);
     
 
-    QMetaObject::invokeMethod(this, "on_core_event",
-      Qt::QueuedConnection,
-      Q_ARG(QString, QString(json_buff.c_str())));
+    emit_mediator_signal("on_core_event", QString::fromStdString(json_buff));
     TIME_MEASURE_FINISH_MS(core_events_handl_time);
     LOG_PRINT_L0("SENT SIGNAL -> [CORE_EVENTS]: " << m_events.m_que.size() 
       << ", handle_time: " << core_events_handl_time << "(json: " << json_buff_generate_time << ")ms, json_buff size = " << json_buff.size() << ", methods: " << methods_list);
@@ -1950,6 +1992,11 @@ QString MainWindow::webkit_launched_script(const QString& param)
 {
   TRY_ENTRY();
   m_last_update_daemon_status_json.clear();
+  // JS attaches signal handlers right after this call; replay on the next
+  // event-loop turn so the pre-HTML init status is not lost to dedup.
+  QTimer::singleShot(0, this, [this]() {
+    replay_last_daemon_state();
+  });
   return "";
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }

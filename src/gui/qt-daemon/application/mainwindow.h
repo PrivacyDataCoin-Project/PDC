@@ -252,6 +252,12 @@ private:
   bool init_window();
   bool init_ipc_server();
   bool remove_ipc();
+
+  // Emit GUI signals on the WebChannel mediator (bridge), not on MainWindow.
+  // QWebChannel only observes the registered mediator_object.
+  void emit_mediator_signal(const char* signal_name, const QString& arg);
+  void emit_mediator_signal(const char* signal_name, const QString& arg1, const QString& arg2);
+  void replay_last_daemon_state();
   
 
   std::string get_wallet_log_prefix(size_t wallet_id) const { return m_backend.get_wallet_log_prefix(wallet_id); }
@@ -318,6 +324,7 @@ private:
   std::unique_ptr<QAction> m_minimize_action;
 
   std::string m_last_update_daemon_status_json;
+  QString m_last_daemon_status_for_ui;
 
   template<typename argument_type, typename response_type, typename callback_t>
   QString prepare_call(const char* name, const QString& param, callback_t cb)
