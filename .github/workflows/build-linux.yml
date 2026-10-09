@@ -486,6 +486,40 @@ jobs:
               awk '$1 ~ /^libevent-2[.]1[.]so[.]/ || $1 ~ /^libminizip[.]so[.]/ { print $1 }'
           )
 
+          # Keep glibc/systemd/NSS/X11 on the host. Bundling Ubuntu 22.04 copies of
+          # these breaks newer hosts (e.g. 26.04 needs LIBSYSTEMD_254 / NSSUTIL_3.108).
+          host_lib_excludes=(
+            'libsystemd.so*'
+            'libudev.so*'
+            'libselinux.so*'
+            'libmount.so*'
+            'libblkid.so*'
+            'libnss3.so*'
+            'libnssutil3.so*'
+            'libnspr4.so*'
+            'libplc4.so*'
+            'libplds4.so*'
+            'libsmime3.so*'
+            'libssl3.so*'
+            'libfreebl3.so*'
+            'libfreeblpriv3.so*'
+            'libsoftokn3.so*'
+            'libnssckbi.so*'
+            'libGL.so*'
+            'libGLdispatch.so*'
+            'libGLX.so*'
+            'libOpenGL.so*'
+            'libEGL.so*'
+            'libdrm.so*'
+            'libgbm.so*'
+            'libX11.so*'
+            'libxcb.so*'
+          )
+          exclude_args=()
+          for pattern in "${host_lib_excludes[@]}"; do
+            exclude_args+=(--exclude-library "$pattern")
+          done
+
           "$linuxdeploy" \
             --appdir "$appdir" \
             --executable "$appdir/usr/bin/Pdc" \
@@ -496,6 +530,25 @@ jobs:
             --icon-file "$appdir/usr/share/icons/hicolor/256x256/apps/Pdc.png" \
             --custom-apprun utils/Pdc_appimage_wrapper.sh \
             --plugin qt \
+            "${exclude_args[@]}"
+
+          # Belt-and-suspenders: plugin-qt may still copy some of the above.
+          while IFS= read -r -d '' stale; do
+            rm -f "$stale"
+          done < <(
+            find "$appdir" \( -type f -o -type l \) \( \
+              -name 'libsystemd.so*' -o -name 'libudev.so*' -o \
+              -name 'libnss3.so*' -o -name 'libnssutil3.so*' -o \
+              -name 'libnspr4.so*' -o -name 'libplc4.so*' -o -name 'libplds4.so*' -o \
+              -name 'libsmime3.so*' -o -name 'libssl3.so*' -o \
+              -name 'libfreebl3.so*' -o -name 'libfreeblpriv3.so*' -o \
+              -name 'libsoftokn3.so*' -o -name 'libnssckbi.so*' \
+            \) -print0
+          )
+          rm -rf "$appdir/usr/lib/nss"
+
+          "$linuxdeploy" \
+            --appdir "$appdir" \
             --output appimage
 
           test -x "$OUTPUT"
