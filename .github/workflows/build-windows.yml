@@ -729,6 +729,27 @@ jobs:
           }
           Get-ChildItem -LiteralPath $env:DIST_DIR -File | Format-Table Name, Length
 
+      - name: Write workflow summary
+        run: |
+          $summary = @(
+            "### Windows ${{ matrix.arch }} build"
+            ""
+            "- Network: $env:NETWORK_NAME"
+            "- Runner: windows-2022 / MSVC v143"
+            "- CLI: ``$env:CLI_BASENAME.zip``"
+          )
+          if ('${{ matrix.gui }}' -eq 'true') {
+            $summary += @(
+              "- GUI: ``$env:GUI_BASENAME.zip``"
+              "- Installer: ``$env:INSTALLER_BASENAME.exe``"
+            )
+          }
+          $summary += @(
+            "- Windows platform signing: $env:SIGNING_STATUS"
+            "- Release checksums: GitHub shows an artifact digest; no separate checksum artifact is produced"
+          )
+          Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value ($summary -join "`n") -Encoding utf8
+
       - name: Upload CLI package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
