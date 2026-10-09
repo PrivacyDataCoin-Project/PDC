@@ -152,6 +152,7 @@ public:
   std::string export_wallet_history(const view::export_wallet_info& ewi);
   std::string setup_wallet_rpc(const std::string& jwt_secret);
   std::string set_remote_node_url(const std::string& url);
+  bool is_remote_node_mode() const { return m_remote_node_mode; }
 
 #ifndef MOBILE_WALLET_BUILD
   currency::core_rpc_server& get_rpc_server() { return m_rpc_server; }
