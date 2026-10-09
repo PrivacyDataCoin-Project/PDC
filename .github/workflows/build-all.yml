@@ -177,50 +177,49 @@ jobs:
           set -euo pipefail
 
           mkdir -p release-assets
-          shopt -s nullglob
 
-          find_one() {
-            local pattern=$1
-            local matches=(artifacts/$pattern)
-            if [[ ${#matches[@]} -eq 0 ]]; then
-              return 1
-            fi
-            if [[ ${#matches[@]} -gt 1 ]]; then
-              echo "::warning::Multiple matches for $pattern; using ${matches[0]}"
-            fi
-            printf '%s' "${matches[0]}"
-          }
+          # Use find (not bash globs): filenames contain [commit] brackets (e.g.
+          # pdc-macos-universal-cli-...[653f35a-dirty].tar.bz2) which break pathname
+          # expansion. Upload every distributable under artifacts/ with its original
+          # basename — no Pdc-* rename mapping.
+          mapfile -t files < <(
+            find artifacts -type f \( \
+              -name 'pdc-*.tar.bz2' -o \
+              -name 'pdc-*.AppImage' -o \
+              -name 'pdc-*.zip' -o \
+              -name 'pdc-*.exe' -o \
+              -name 'pdc-*.dmg' \
+            \) | LC_ALL=C sort
+          )
 
-          stage() {
-            local pattern=$1
-            local dest_name=$2
-            local src
-            if ! src=$(find_one "$pattern"); then
-              echo "skip missing: $pattern -> $dest_name"
-              return 0
-            fi
-            cp -f "$src" "release-assets/$dest_name"
-            echo "staged $dest_name ($(du -h "release-assets/$dest_name" | awk '{print $1}'))"
-          }
-
-          # Prefer release names close to v2.4.0 while covering new multi-arch CI outputs.
-          stage 'pdc-linux-x64-cli-*.tar.bz2'          "Pdc-v${VERSION}-ubuntu-22.04.tar.bz2"
-          stage 'pdc-linux-x64-gui-*.AppImage'         "Pdc-GUI-v${VERSION}-ubuntu-22.04.AppImage"
-          stage 'pdc-linux-arm64-cli-*.tar.bz2'        "Pdc-v${VERSION}-linux-arm64.tar.bz2"
-          stage 'pdc-linux-arm64-gui-*.AppImage'       "Pdc-GUI-v${VERSION}-linux-arm64.AppImage"
-          stage 'pdc-windows-x64-cli-*.zip'            "Pdc-v${VERSION}-windows.zip"
-          stage 'pdc-windows-x64-gui-*.zip'            "Pdc-Gui-v${VERSION}-windows.zip"
-          stage 'pdc-windows-x64-gui-*-installer.exe'  "Pdc-Gui-v${VERSION}-windows.exe"
-          stage 'pdc-macos-universal-cli-*.tar.bz2'    "Pdc-v${VERSION}-osx.tar.bz2"
-          stage 'pdc-macos-arm64-gui-*.dmg'            "Pdc-Gui-v${VERSION}-osx-arm64.dmg"
-          stage 'pdc-macos-x64-gui-*.dmg'              "Pdc-Gui-v${VERSION}-osx-x64.dmg"
-
-          mapfile -t staged < <(find release-assets -type f | sort)
-          if [[ ${#staged[@]} -eq 0 ]]; then
-            echo '::error::No release assets were staged from CI artifacts'
-            find artifacts -type f | sort || true
+          if [[ ${#files[@]} -eq 0 ]]; then
+            echo '::error::No release assets were found under artifacts/'
+            find artifacts -type f | LC_ALL=C sort || true
             exit 1
           fi
+
+          for src in "${files[@]}"; do
+            base=$(basename -- "$src")
+            cp -f -- "$src" "release-assets/$base"
+            echo "staged $base ($(du -h "release-assets/$base" | awk '{print $1}'))"
+          done
+
+          mapfile -t staged < <(find release-assets -type f | LC_ALL=C sort)
+          if [[ ${#staged[@]} -eq 0 ]]; then
+            echo '::error::No release assets were staged from CI artifacts'
+            exit 1
+          fi
+
+          # Drop previously renamed Pdc-* assets so the release is not duplicated.
+          mapfile -t old_renamed < <(
+            gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' \
+              | grep -E '^Pdc-' || true
+          )
+          for old in "${old_renamed[@]+"${old_renamed[@]}"}"; do
+            [[ -z "$old" ]] && continue
+            echo "removing old renamed asset: $old"
+            gh release delete-asset "$TAG" "$old" --repo "$GITHUB_REPOSITORY" --yes
+          done
 
           gh release upload "$TAG" "${staged[@]}" --repo "$GITHUB_REPOSITORY" --clobber
 
