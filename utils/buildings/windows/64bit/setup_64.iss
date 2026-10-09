@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "PDC"
-#define MyAppVersion "2.4.0.7"
+#define MyAppVersion "2.4.1.8"
 #define MyAppPublisher "Pdc Team"
 #define MyAppURL "http://privacydatacoin.com"
 #define MyAppExeName "Pdc.exe"
