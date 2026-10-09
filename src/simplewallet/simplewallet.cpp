@@ -3227,6 +3227,7 @@ int main(int argc, char* argv[])
   po::options_description desc_all;
   desc_all.add(desc_general).add(desc_params);
   po::variables_map vm;
+  bool informational_exit = false;
   bool r = command_line::handle_error_helper(desc_all, [&]()
   {
     po::store(command_line::parse_command_line(argc, argv, desc_general, true), vm);
@@ -3235,11 +3236,13 @@ int main(int argc, char* argv[])
     {
       success_msg_writer() << "Usage: simplewallet [--wallet-file=<file>|--generate-new-wallet=<file>] [--daemon-address=<host>:<port>] [<COMMAND>]";
       success_msg_writer() << desc_all << '\n' << sw->get_commands_str();
+      informational_exit = true;
       return false;
     }
     else if (command_line::get_arg(vm, command_line::arg_version))
     {
       success_msg_writer() << CURRENCY_NAME << " wallet v" << PROJECT_VERSION_LONG;
+      informational_exit = true;
       return false;
     }
 
@@ -3249,7 +3252,7 @@ int main(int argc, char* argv[])
     return true;
   });
   if (!r)
-    return EXIT_FAILURE;
+    return informational_exit ? EXIT_SUCCESS : EXIT_FAILURE;
 
   //set up logging options
   log_space::get_set_log_detalisation_level(true, LOG_LEVEL_0);
