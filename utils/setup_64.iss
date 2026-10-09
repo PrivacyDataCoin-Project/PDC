@@ -32,7 +32,7 @@ WizardImageFile=../resources/installer_bg_164x313.bmp
 PrivilegesRequired=poweruser
 ArchitecturesAllowed=x64
 ;SetupIconFile=../resources/app.ico
-AppMutex=Pdc_instance
+AppMutex=PDC_instance
 UninstallDisplayIcon={app}\{#MyAppExeName}
 
 
