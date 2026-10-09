@@ -210,31 +210,22 @@ jobs:
             exit 1
           fi
 
-          # Drop previously renamed Pdc-* assets so the release is not duplicated.
-          mapfile -t old_renamed < <(
-            gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' \
-              | grep -E '^Pdc-' || true
+          # Filenames embed the short commit SHA, so same-name clobber cannot replace
+          # assets from an older build of the same tag. Clear the release first.
+          release_id=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq .id)
+          mapfile -t existing_ids < <(
+            gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}/assets" --paginate --jq '.[].id'
           )
-          for old in "${old_renamed[@]+"${old_renamed[@]}"}"; do
-            [[ -z "$old" ]] && continue
-            echo "removing old renamed asset: $old"
-            gh release delete-asset "$TAG" "$old" --repo "$GITHUB_REPOSITORY" --yes
+          for asset_id in "${existing_ids[@]+"${existing_ids[@]}"}"; do
+            [[ -z "${asset_id:-}" ]] && continue
+            echo "removing prior release asset id=$asset_id"
+            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/assets/${asset_id}" >/dev/null
           done
 
           # Upload via the releases assets API (not `gh release upload`): gh filepath-globs
           # arguments, so names containing [commit] brackets fail with "no matches found".
-          release_id=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq .id)
           for f in "${staged[@]}"; do
             name=$(basename -- "$f")
-            # Use jq env (not --arg): `gh api --jq` takes one expression argument only.
-            existing_id=$(
-              NAME="$name" gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}/assets" --paginate \
-                --jq '.[] | select(.name == env.NAME) | .id' | head -n1 || true
-            )
-            if [[ -n "${existing_id:-}" ]]; then
-              echo "clobber existing asset: $name ($existing_id)"
-              gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/assets/${existing_id}" >/dev/null
-            fi
             encoded=$(python3 -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))' "$name")
             echo "uploading $name"
             curl -sSLf -X POST \
