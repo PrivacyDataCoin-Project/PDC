@@ -12,40 +12,47 @@ WebChannelBridge::WebChannelBridge(MainWindow& main_window, QObject* parent)
 {
   setObjectName(QStringLiteral("web_channel_bridge"));
 
-  connect(&m_main_window, &MainWindow::quit_requested,
-    this, &WebChannelBridge::quit_requested);
-  connect(&m_main_window, &MainWindow::update_daemon_state,
-    this, &WebChannelBridge::update_daemon_state);
+  // Prefer explicit emit over signal-to-signal so QWebChannel always sees
+  // notifications on the registered mediator object (some Qt5 builds drop
+  // signal-to-signal forwarding to the channel).
+  connect(&m_main_window, &MainWindow::quit_requested, this,
+    [this](const QString& str) { emit quit_requested(str); });
+  connect(&m_main_window, &MainWindow::update_daemon_state, this,
+    [this](const QString& str) { emit update_daemon_state(str); });
   connect(&m_main_window,
-    static_cast<void (MainWindow::*)(QString)>(&MainWindow::update_wallet_status),
-    this, &WebChannelBridge::update_wallet_status);
-  connect(&m_main_window, &MainWindow::update_wallet_info,
-    this, &WebChannelBridge::update_wallet_info);
+    static_cast<void (MainWindow::*)(QString)>(&MainWindow::update_wallet_status), this,
+    [this](const QString& str) { emit update_wallet_status(str); });
+  connect(&m_main_window, &MainWindow::update_wallet_info, this,
+    [this](const QString& str) { emit update_wallet_info(str); });
   connect(&m_main_window,
-    static_cast<void (MainWindow::*)(QString)>(&MainWindow::money_transfer),
-    this, &WebChannelBridge::money_transfer);
+    static_cast<void (MainWindow::*)(QString)>(&MainWindow::money_transfer), this,
+    [this](const QString& str) { emit money_transfer(str); });
   connect(&m_main_window,
-    static_cast<void (MainWindow::*)(QString)>(&MainWindow::money_transfer_cancel),
-    this, &WebChannelBridge::money_transfer_cancel);
+    static_cast<void (MainWindow::*)(QString)>(&MainWindow::money_transfer_cancel), this,
+    [this](const QString& str) { emit money_transfer_cancel(str); });
   connect(&m_main_window,
-    static_cast<void (MainWindow::*)(QString)>(&MainWindow::wallet_sync_progress),
-    this, &WebChannelBridge::wallet_sync_progress);
-  connect(&m_main_window, &MainWindow::handle_internal_callback,
-    this, &WebChannelBridge::handle_internal_callback);
-  connect(&m_main_window, &MainWindow::update_pos_mining_text,
-    this, &WebChannelBridge::update_pos_mining_text);
+    static_cast<void (MainWindow::*)(QString)>(&MainWindow::wallet_sync_progress), this,
+    [this](const QString& str) { emit wallet_sync_progress(str); });
+  connect(&m_main_window, &MainWindow::handle_internal_callback, this,
+    [this](const QString& str, const QString& callback_name) {
+      emit handle_internal_callback(str, callback_name);
+    });
+  connect(&m_main_window, &MainWindow::update_pos_mining_text, this,
+    [this](const QString& str) { emit update_pos_mining_text(str); });
   connect(&m_main_window,
-    static_cast<void (MainWindow::*)(QString)>(&MainWindow::on_core_event),
-    this, &WebChannelBridge::on_core_event);
+    static_cast<void (MainWindow::*)(QString)>(&MainWindow::on_core_event), this,
+    [this](const QString& str) { emit on_core_event(str); });
   connect(&m_main_window,
-    static_cast<void (MainWindow::*)(QString)>(&MainWindow::set_options),
-    this, &WebChannelBridge::set_options);
-  connect(&m_main_window, &MainWindow::handle_deeplink_click,
-    this, &WebChannelBridge::handle_deeplink_click);
-  connect(&m_main_window, &MainWindow::handle_current_action_state,
-    this, &WebChannelBridge::handle_current_action_state);
-  connect(&m_main_window, &MainWindow::dispatch_async_call_result,
-    this, &WebChannelBridge::dispatch_async_call_result);
+    static_cast<void (MainWindow::*)(QString)>(&MainWindow::set_options), this,
+    [this](const QString& str) { emit set_options(str); });
+  connect(&m_main_window, &MainWindow::handle_deeplink_click, this,
+    [this](const QString& str) { emit handle_deeplink_click(str); });
+  connect(&m_main_window, &MainWindow::handle_current_action_state, this,
+    [this](const QString& str) { emit handle_current_action_state(str); });
+  connect(&m_main_window, &MainWindow::dispatch_async_call_result, this,
+    [this](const QString& id, const QString& resp) {
+      emit dispatch_async_call_result(id, resp);
+    });
 }
 
 #define PDC_FORWARD_QSTRING_1(method_name) \
