@@ -6,7 +6,7 @@ SET(Boost_USE_STATIC_LIBS ON)           # link statically
 
 
 if(MSVC)
-  add_definitions("/D_CRT_SECURE_NO_WARNINGS /D_WIN32_WINNT=0x0600 /DWIN32_LEAN_AND_MEAN")
+  add_definitions("/D_CRT_SECURE_NO_WARNINGS /D_WIN32_WINNT=0x0600 /DWIN32_LEAN_AND_MEAN /DNOMINMAX")
 endif()
 
 
