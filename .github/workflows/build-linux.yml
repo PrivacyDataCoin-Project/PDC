@@ -573,6 +573,14 @@ jobs:
               patchelf --set-rpath '$ORIGIN' "$dest"
             fi
           done
+          # Ship NSS checksum sidecars next to the modules (same basename layout).
+          mapfile -t nss_chk_files < <(
+            printf '%s\n' "$nss_package_files" |
+              awk -F/ '$NF ~ /[.]chk$/ && !seen[$NF]++ { print }'
+          )
+          for chk in "${nss_chk_files[@]}"; do
+            install -m 0644 "$chk" "$appdir/usr/lib/${chk##*/}"
+          done
           # Ensure GUI binaries prefer AppDir usr/lib for NSS/NSPR after the
           # force-copy (DT_RUNPATH from linuxdeploy alone can still lose to host).
           webengine_process=$(find "$appdir" -type f -name QtWebEngineProcess -print -quit)
@@ -702,15 +710,26 @@ jobs:
             fi
           done
 
+          # Guard against regressing the AppRun LD_LIBRARY_PATH pin required for
+          # Ubuntu 24.04+/26.04 hosts when the image is built on 22.04.
+          if ! grep -Fq 'LD_LIBRARY_PATH="${script_dir}/usr/lib' \
+              "$appdir/AppRun.wrapped" 2>/dev/null \
+            && ! grep -Fq 'LD_LIBRARY_PATH="${script_dir}/usr/lib' \
+              "$appdir/AppRun" 2>/dev/null; then
+            echo '::error::AppRun wrapper does not prepend AppDir usr/lib to LD_LIBRARY_PATH'
+            exit 1
+          fi
+
       - name: Write workflow summary
         run: |
           {
             echo "### Linux ${{ matrix.arch }} build"
             echo
             echo "- Network: $NETWORK_NAME"
-            echo "- Runtime baseline: ${{ matrix.baseline }}"
+            echo "- Runtime baseline: ${{ matrix.baseline }} (AppImage intended for this glibc and newer)"
             echo "- CLI: \`$CLI_BASENAME.tar.bz2\`"
             echo "- GUI: \`$GUI_BASENAME.AppImage\`"
+            echo "- Newer-host notes: bundled builder NSS/NSPR + AppRun LD_LIBRARY_PATH pin; host systemd/GL/X11"
             echo "- Linux platform signing: not configured"
             echo "- Release checksums: GitHub shows an artifact digest; no separate checksum artifact is produced"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -730,3 +749,63 @@ jobs:
           path: dist-linux/pdc-linux-${{ matrix.arch }}-gui*.AppImage
           if-no-files-found: error
           compression-level: 0
+
+  # x64 images are built on Ubuntu 22.04 (glibc 2.35). Smoke them on a newer
+  # runner so NSS/systemd regressions that only show on 24.04+ fail CI early.
+  smoke-ubuntu-2404-x64:
+    name: Smoke AppImage on Ubuntu 24.04 (x64)
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Install runtime smoke dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ca-certificates \
+            libgl1 \
+            libnss3 \
+            libxcb-cursor0 \
+            libxcb-xinerama0 \
+            libxkbcommon-x11-0 \
+            xvfb
+
+      - name: Download x64 GUI AppImage artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: pdc-linux-x64-gui-*
+          merge-multiple: true
+          path: artifacts
+
+      - name: CLI and GUI smoke (Xvfb)
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          images=(artifacts/pdc-linux-x64-gui-*.AppImage)
+          if (( ${#images[@]} != 1 )); then
+            echo "::error::Expected exactly one x64 GUI AppImage, found ${#images[@]}"
+            ls -la artifacts || true
+            exit 1
+          fi
+          appimage="${images[0]}"
+          chmod 0755 "$appimage"
+          export APPIMAGE_EXTRACT_AND_RUN=1
+
+          "$appimage" --exec=pdcd --exec-args='--version'
+          "$appimage" --exec=simplewallet --exec-args='--version'
+          "$appimage" --exec=connectivity_tool --exec-args='--version'
+
+          # GUI must stay alive under Xvfb (no immediate segfault / WebEngine abort).
+          set +e
+          xvfb-run -a timeout 20s "$appimage"
+          rc=$?
+          set -e
+          # timeout -> 124 means the process was still running (success for smoke).
+          if [[ "$rc" -ne 124 ]]; then
+            echo "::error::GUI AppImage exited early under Xvfb (status=$rc); expected timeout 124"
+            exit 1
+          fi
+          echo "GUI smoke OK on ubuntu-24.04 (still running after 20s)"

@@ -10,8 +10,24 @@ if [ -d "${script_dir}/apprun-hooks" ]; then
   done
 fi
 
-# Keep LD_LIBRARY_PATH from apprun-hooks so the complete builder NSS/NSPR set
-# (zano#767 / Ubuntu 26.04 AppImage fix) resolves ahead of any host softokn.
+# --custom-apprun replaces linuxdeploy's default AppRun, and plugin-qt's hook does
+# not set LD_LIBRARY_PATH. NSS loads softokn/freebl via dlopen by soname; without
+# AppDir usr/lib first, a newer host softokn (Ubuntu 24.04+/26.04) mixes with the
+# builder NSS set from Ubuntu 22.04 and Chromium/WebEngine aborts (zano#762/#767).
+if [ -d "${script_dir}/usr/lib" ]; then
+  export LD_LIBRARY_PATH="${script_dir}/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
+if [ -d "${script_dir}/usr/plugins" ]; then
+  export QT_PLUGIN_PATH="${script_dir}/usr/plugins${QT_PLUGIN_PATH:+:$QT_PLUGIN_PATH}"
+fi
+if [ -d "${script_dir}/usr/plugins/platforms" ]; then
+  export QT_QPA_PLATFORM_PLUGIN_PATH="${script_dir}/usr/plugins/platforms"
+fi
+if [ -x "${script_dir}/usr/libexec/QtWebEngineProcess" ]; then
+  export QTWEBENGINEPROCESS_PATH="${script_dir}/usr/libexec/QtWebEngineProcess"
+elif [ -x "${script_dir}/usr/bin/QtWebEngineProcess" ]; then
+  export QTWEBENGINEPROCESS_PATH="${script_dir}/usr/bin/QtWebEngineProcess"
+fi
 
 parse_manual_binary_arguments()
 {
@@ -198,7 +214,7 @@ call_app()
 
   rc=$?
   if [ $rc -ne 0 ]; then
-    echo $'\n\n\x1b[1mIf Pdc fails to launch, it might need to install xinerama extension for the X C Binding with this command:\n\x1b[2m   sudo apt-get install libxcb-xinerama0\n\n'
+    echo $'\n\n\x1b[1mIf Pdc fails to launch:\n\x1b[2m   sudo apt-get install libxcb-xinerama0 libgl1 libx11-6 libxcb1\n\x1b[1mOn systems where FUSE is unavailable, try:\n\x1b[2m   APPIMAGE_EXTRACT_AND_RUN=1 ./pdc-linux-*-gui-*.AppImage\n\n'
   fi
 
   popd >/dev/null
