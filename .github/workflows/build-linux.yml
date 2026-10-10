@@ -478,6 +478,12 @@ jobs:
           pdcd, simplewallet, and connectivity_tool.
           Select a CLI program with --exec=<name>; pass its arguments with
           --exec-args='<arguments>'. License texts are under usr/share/doc/pdc/.
+
+          Host packages required for the GUI (GL/EGL/X11 are not bundled):
+            sudo apt-get install libegl1 libgl1 libopengl0 libxcb-xinerama0 \\
+              libx11-6 libxcb1 libxkbcommon-x11-0 libxcb-cursor0
+          If FUSE is unavailable:
+            APPIMAGE_EXTRACT_AND_RUN=1 ./pdc-linux-*-gui-*.AppImage
           EOF
 
           linuxdeploy="$TOOLS_DIR/linuxdeploy-${{ matrix.appimage_arch }}.AppImage"
@@ -763,11 +769,14 @@ jobs:
       - name: Install runtime smoke dependencies
         run: |
           set -euo pipefail
+          # AppImage keeps GL/EGL/X11 on the host (see linuxdeploy excludes).
+          # Ubuntu 24.04's libgl1 does not pull libEGL.so.1 — install explicitly.
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             ca-certificates \
+            libegl1 \
             libgl1 \
-            libnss3 \
+            libopengl0 \
             libxcb-cursor0 \
             libxcb-xinerama0 \
             libxkbcommon-x11-0 \
@@ -800,12 +809,15 @@ jobs:
 
           # GUI must stay alive under Xvfb (no immediate segfault / WebEngine abort).
           set +e
-          xvfb-run -a timeout 20s "$appimage"
-          rc=$?
+          xvfb-run -a timeout 20s "$appimage" 2>&1 | tee gui-smoke.log
+          rc=${PIPESTATUS[0]}
           set -e
           # timeout -> 124 means the process was still running (success for smoke).
           if [[ "$rc" -ne 124 ]]; then
             echo "::error::GUI AppImage exited early under Xvfb (status=$rc); expected timeout 124"
+            if grep -E 'error while loading shared libraries|Naruszenie|Segmentation|Aborted|FATAL' gui-smoke.log; then
+              echo '::error::See shared-library / crash lines above (host GL/EGL often missing on bare runners)'
+            fi
             exit 1
           fi
           echo "GUI smoke OK on ubuntu-24.04 (still running after 20s)"
