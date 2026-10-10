@@ -8,36 +8,52 @@ Be sure to clone the repository properly:\
 
 
 ### Dependencies
-| component / version | minimum <br>(not recommended but may work) | recommended | most recent of what we have ever tested |
-|--|--|--|--|
-| gcc (Linux) | 5.4.0 | 9.4.0 | 12.3.0 |
-| llvm/clang (Linux) | UNKNOWN | 7.0.1 | 8.0.0 |
-| [MSVC](https://visualstudio.microsoft.com/downloads/) (Windows) | 2017 (15.9.30) | 2019 (16.11.34) | 2022 (17.11.5) |
-| [XCode](https://developer.apple.com/downloads/) (macOS) | 12.3 | 14.3 | 15.2 |
-| [CMake](https://cmake.org/download/) | 3.15.5 | 3.26.3 | 3.29.0 |
-| [Boost](https://www.boost.org/users/download/) | 1.75 | 1.84 | 1.84 |
-| [OpenSSL](https://www.openssl.org/source/) [(win)](https://slproweb.com/products/Win32OpenSSL.html) | 1.1.1n | 1.1.1w | 1.1.1w | 
-| [Qt](https://download.qt.io/archive/qt/) (*only for GUI*) | 5.8.0 | 5.11.2 | 5.15.2 |
+
+Versions below are the ones used by the current release CI (the Linux AppImage, Windows, and macOS jobs on `master`). A local build that should match a release binary should use these, not the older Qt 5 / OpenSSL 1.1 pins.
+
+| component | release CI | notes |
+|--|--|--|
+| gcc (Linux) | 11 (Ubuntu 22.04) | x64 release images are built on Ubuntu 22.04 |
+| [MSVC](https://visualstudio.microsoft.com/downloads/) | 2022 (windows-2022) | |
+| [Xcode](https://developer.apple.com/downloads/) | macOS 14+ host | GUI deployment target is macOS 12.0 because of Qt 6.8 |
+| [CMake](https://cmake.org/download/) | 3.16 or newer | `CMakeLists.txt` requires 3.16 |
+| [Boost](https://www.boost.org/users/download/) | **1.84.0** | static libraries, `runtime-link=static` when `STATIC=TRUE`. Components: system, filesystem, thread, date_time, chrono, regex, serialization, atomic, program_options, locale, timer, log |
+| [OpenSSL](https://www.openssl.org/source/) | **3.5.8** on Linux and Windows, **3.5.7** on macOS | static (`no-shared`) in release CI |
+| [Qt](https://download.qt.io/archive/qt/6.8/6.8.3/) (*GUI only*) | **6.8.3** | modules: Widgets, WebEngine, WebChannel, PrintSupport, plus WebEngine's `qtpositioning` and `qtserialport`. CMake still accepts Qt 5 if `Qt5WebEngineWidgets` is found; release builds do not use it |
 
 Note:\
-[*server version*] denotes steps required for building command-line tools (daemon, simplewallet, etc.).\
-[*GUI version*] denotes steps required for building Pdc executable with GUI.
+[*server version*] denotes steps required for building command-line tools (`pdcd`, `simplewallet`, `connectivity_tool`).\
+[*GUI version*] denotes steps required for building the `Pdc` executable.
 
 <br />
 
 ### Linux
 
-Recommended OS versions: Ubuntu 20.04, 22.04 LTS.
+Recommended OS for a build that matches the release AppImage: Ubuntu 22.04 LTS. Newer hosts can compile too; the shipped x64 image is still built on 22.04.
 
-1. Prerequisites
+1. Packages
 
    [*server version*]
-   
-       sudo apt-get install -y build-essential g++ curl autotools-dev libicu-dev libbz2-dev cmake git screen checkinstall zlib1g-dev
-          
-   [*GUI version*]
 
-       sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git screen checkinstall zlib1g-dev mesa-common-dev libglu1-mesa-dev
+       sudo apt-get update
+       sudo apt-get install -y --no-install-recommends \
+         build-essential g++ cmake git curl ca-certificates bzip2 pkg-config perl \
+         libbz2-dev zlib1g-dev libicu-dev
+
+   [*GUI version*] — the server packages, plus the libraries the Linux CI image installs before configuring Qt 6.8:
+
+       sudo apt-get update
+       sudo apt-get install -y --no-install-recommends \
+         build-essential g++ cmake git curl ca-certificates bzip2 pkg-config perl \
+         python3 python3-pip python3-venv \
+         libbz2-dev zlib1g-dev libicu-dev \
+         libevent-dev libminizip-dev \
+         libgl1-mesa-dev libglu1-mesa-dev \
+         libnss3 libnspr4 \
+         libxkbcommon-x11-0 libxcb-cursor0 libxcb-xinerama0 \
+         desktop-file-utils file patchelf rsync
+
+   `python3` is only needed if you install Qt with `aqtinstall` (step 4). `patchelf` is only needed when packing an AppImage, not for a plain `cmake` build.
 
 2. Clone PDC into a local folder\
    (The default branch is master. To use another branch, add `-b` and the branch name.)
@@ -46,37 +62,46 @@ Recommended OS versions: Ubuntu 20.04, 22.04 LTS.
 
    In the following steps we assume that you cloned PDC into '~/pdc' folder in your home directory. 
 
-3. Download and build Boost\
-    (Assuming you have cloned PDC into the 'pdc' folder. If you used a different location for PDC, **edit line 4** accordingly.)
+3. Download and build Boost 1.84.0
 
-       curl -OL https://boostorg.jfrog.io/artifactory/main/release/1.84.0/source/boost_1_84_0.tar.bz2
-       echo "cc4b893acf645c9d4b698e9a0f08ca8846aa5d6c68275c14c3e7949c24109454  boost_1_84_0.tar.bz2" | shasum -c && tar -xjf boost_1_84_0.tar.bz2
-       rm boost_1_84_0.tar.bz2 && cd boost_1_84_0
-       ./bootstrap.sh --with-libraries=system,filesystem,thread,date_time,chrono,regex,serialization,atomic,program_options,locale,timer,log
-       ./b2 && cd ..
-    Make sure that you see "The Boost C++ Libraries were successfully built!" message at the end.
+   Release CI builds static Boost 1.84.0 with `runtime-link=static`, which `STATIC=TRUE` requires. The `log` component is required (`find_package` asks for it). Checksums match `.github/workflows/build-linux.yml`.
 
-4. Install Qt\
-(*GUI version only, skip this step if you're building server version*)
+       curl -fL -O https://archives.boost.io/release/1.84.0/source/boost_1_84_0.tar.bz2
+       echo "cc4b893acf645c9d4b698e9a0f08ca8846aa5d6c68275c14c3e7949c24109454  boost_1_84_0.tar.bz2" | sha256sum -c
+       tar -xjf boost_1_84_0.tar.bz2
+       cd boost_1_84_0
+       ./bootstrap.sh --prefix=$HOME/boost_1_84_0 \
+         --with-libraries=system,filesystem,thread,date_time,chrono,regex,serialization,atomic,program_options,locale,timer,log
+       ./b2 -j"$(nproc)" link=static runtime-link=static threading=multi variant=release install
+       cd ..
 
-    [*GUI version*]
+   Installed tree: `$HOME/boost_1_84_0` (headers and `lib/libboost_*.a`).
 
-       curl -OL https://download.qt.io/new_archive/qt/5.11/5.11.2/qt-opensource-linux-x64-5.11.2.run
-       chmod +x qt-opensource-linux-x64-5.11.2.run
-       ./qt-opensource-linux-x64-5.11.2.run
-    Then follow the instructions in Wizard. Don't forget to tick the WebEngine module checkbox!
+4. Install Qt 6.8.3\
+(*GUI version only*)
 
+   Release CI installs Qt **6.8.3** for the desktop kit, with modules `qtwebengine`, `qtwebchannel`, `qtpositioning`, and `qtserialport`. Widgets and PrintSupport come with the base kit.
 
-5. Install OpenSSL
+       python3 -m pip install --user 'aqtinstall==3.3.0'
+       python3 -m aqt install-qt linux desktop 6.8.3 linux_gcc_64 -O "$HOME/Qt" \
+         -m qtwebengine qtwebchannel qtpositioning qtserialport
 
-   We recommend installing OpenSSL v1.1.1w locally unless you would like to use the same version system-wide.\
-   (Assuming that `$HOME` environment variable is set to your home directory. Otherwise, edit line 4 accordingly.)
+   Prefix used below: `$HOME/Qt/6.8.3/gcc_64`.
 
-       curl -OL https://www.openssl.org/source/openssl-1.1.1w.tar.gz
-       echo "cf3098950cb4d853ad95c0841f1f9c6d3dc102dccfcacd521d93925208b76ac8  openssl-1.1.1w.tar.gz" | shasum -c && tar xaf openssl-1.1.1w.tar.gz 
-       cd openssl-1.1.1w/
-       ./config --prefix=$HOME/openssl --openssldir=$HOME/openssl shared zlib
-       make && make test && make install && cd ..
+   The Qt online installer works too: select Qt 6.8.3, the desktop gcc 64-bit kit, and Qt WebEngine.
+
+5. Install OpenSSL 3.5.8
+
+   Release CI builds OpenSSL **3.5.8** static (`no-shared`) on Linux and Windows. macOS release CI uses **3.5.7**. Install it locally; do not point the build at OpenSSL 1.1.1.
+
+       curl -fL -o openssl-3.5.8.tar.gz \
+         https://github.com/openssl/openssl/releases/download/openssl-3.5.8/openssl-3.5.8.tar.gz
+       echo "a8f84a39918ec6415ce765d9b429d313ba97b8143169c172e734b9514464f5b2  openssl-3.5.8.tar.gz" | sha256sum -c
+       tar -xzf openssl-3.5.8.tar.gz
+       cd openssl-3.5.8
+       ./Configure linux-x86_64 no-shared no-tests --prefix=$HOME/openssl --openssldir=$HOME/openssl --libdir=lib
+       make -j"$(nproc)" && make install_sw
+       cd ..
 
 
 6. [*OPTIONAL*] Set global environment variables for convenient use\
@@ -84,53 +109,62 @@ For instance, by adding the following lines to `~/.bashrc`
 
     [*server version*]
 
-       export BOOST_ROOT=/home/user/boost_1_84_0  
-       export OPENSSL_ROOT_DIR=/home/user/openssl
+       export BOOST_ROOT=$HOME/boost_1_84_0
+       export BOOST_LIBRARYDIR=$HOME/boost_1_84_0/lib
+       export OPENSSL_ROOT_DIR=$HOME/openssl
 
 
     [*GUI version*]
 
-       export BOOST_ROOT=/home/user/boost_1_84_0
-       export OPENSSL_ROOT_DIR=/home/user/openssl  
-       export QT_PREFIX_PATH=/home/user/Qt5.11.2/5.11.2/gcc_64
+       export BOOST_ROOT=$HOME/boost_1_84_0
+       export BOOST_LIBRARYDIR=$HOME/boost_1_84_0/lib
+       export OPENSSL_ROOT_DIR=$HOME/openssl
+       export QT_PREFIX_PATH=$HOME/Qt/6.8.3/gcc_64
 
       **NOTICE: Please edit the lines above according to your actual paths.**
    
       **NOTICE 2:** Make sure you've restarted your terminal session (by reopening the terminal window or reconnecting the server) to apply these changes.
 
-8. Build the binaries
-   1. If you skipped step 6 and did not set the environment variables:
+7. Build the binaries
 
-          cd pdc && mkdir build && cd build
-          BOOST_ROOT=$HOME/boost_1_70_0 OPENSSL_ROOT_DIR=$HOME/openssl cmake ..
-          make -j1 daemon simplewallet
+   From the repository root. `STATIC=TRUE` matches the release CI link and needs the static Boost and OpenSSL trees from the steps above.
 
-   2. If you set the variables in step 6:
+   [*server version*]
 
-          cd pdc && mkdir build && cd build
-          cmake ..
-          make -j1 daemon simplewallet
+       cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSTATIC=TRUE -DBUILD_GUI=FALSE \
+         -DBOOST_ROOT="$BOOST_ROOT" -DBOOST_LIBRARYDIR="$BOOST_LIBRARYDIR" \
+         -DOPENSSL_ROOT_DIR="$OPENSSL_ROOT_DIR" -DOPENSSL_USE_STATIC_LIBS=TRUE
+       cmake --build build --parallel --target daemon simplewallet connectivity_tool
 
-      or simply:
+   Binaries: `build/src/pdcd`, `build/src/simplewallet`, `build/src/connectivity_tool`.
 
-          cd pdc && make -j1
-   
-      **NOTICE**: If you are building on a machine with a relatively high amount of RAM or with the proper setting of virtual memory, then you can use `-j2` or `-j` option to speed up the building process. Use with caution.
-      
-      **NOTICE 2**: If you'd like to build binaries for the testnet, use `cmake -D TESTNET=TRUE ..` instead of `cmake ..` .
-   
-   1. Build GUI:
+   [*GUI version*]
 
-          cd pdc
-          utils/build_script_linux.sh
+       cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSTATIC=TRUE -DBUILD_GUI=TRUE \
+         -DBOOST_ROOT="$BOOST_ROOT" -DBOOST_LIBRARYDIR="$BOOST_LIBRARYDIR" \
+         -DOPENSSL_ROOT_DIR="$OPENSSL_ROOT_DIR" -DOPENSSL_USE_STATIC_LIBS=TRUE \
+         -DCMAKE_PREFIX_PATH="$QT_PREFIX_PATH"
+       cmake --build build --parallel --target Pdc
 
-    Look for the binaries in `build` folder
+   Binary: `build/src/Pdc`. The GUI must link the shared `libstdc++` that Qt loads. Do not pass `-static-libstdc++` to `Pdc`; `STATIC=TRUE` applies that flag only to the CLI targets.
+
+   For a testnet build add `-DTESTNET=TRUE`.
+
+   `utils/build_script_linux.sh` is an older helper. Its Qt 5 library copy list does not match Qt 6.8.3; prefer the `cmake` commands above.
+
+### Running the Linux AppImage
+
+The release AppImage is built on Ubuntu 22.04 and is meant to run on that glibc and newer. It does not bundle GL, EGL, or X11. If the GUI fails to start, install the host libraries named by `utils/Pdc_appimage_wrapper.sh`:
+
+    sudo apt-get install -y libegl1 libgl1 libopengl0 libxcb-xinerama0 libx11-6 libxcb1
+
+On a machine without FUSE: `APPIMAGE_EXTRACT_AND_RUN=1 ./pdc-linux-x64-gui-*.AppImage`.
 
 <br />
 
 ### Windows
-Recommended OS version: Windows 7 x64, Windows 11 x64.
-1. Install required prerequisites (Boost, Qt, CMake, OpenSSL).
+Recommended OS version: Windows 11 x64. Release CI runs on `windows-2022` with MSVC 2022.
+1. Install the same dependency versions as Linux, with the Windows CI pins: Boost **1.84.0** (static libs, shared CRT), OpenSSL **3.5.8** (static libs, shared CRT), Qt **6.8.3** (MSVC 2022 x64, WebEngine), CMake 3.16 or newer.
 2. Edit paths in `utils/configure_local_paths.cmd`.
 3. Run one of `utils/configure_win64_msvsNNNN_gui.cmd` according to your MSVC version.
 4. Go to the build folder and open generated Pdc.sln in MSVC.
@@ -146,8 +180,8 @@ In order to correctly deploy Qt GUI application, you also need to do the followi
 <br />
 
 ### macOS
-Recommended OS version: macOS Big Sur 11.4 x64.
-1. Install required prerequisites.
+Release CI uses Boost **1.84.0**, OpenSSL **3.5.7**, and Qt **6.8.3** (WebEngine). The GUI deployment target is macOS 12.0.
+1. Install those prerequisites.
 2. Set environment variables as stated in `utils/macosx_build_config.command`.
 3.  `mkdir build` <br> `cd build` <br> `cmake ..` <br> `make`
 
