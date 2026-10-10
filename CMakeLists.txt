@@ -244,7 +244,10 @@ else()
     if(APPLE)
       message(SEND_ERROR "Static build is not supported on MacOS X")
     else()
-      set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libgcc -static-libstdc++")
+      # libgcc stays static. libstdc++ stays shared for the Qt GUI (see src/CMakeLists.txt):
+      # Qt already loads libstdc++.so.6, and a second static copy makes ostream
+      # formatting throw std::bad_cast on newer hosts.
+      set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libgcc")
     endif()
   endif()
 endif()
