@@ -239,6 +239,19 @@ jobs:
             fi
           done
 
+          # Pdc shares Qt's libstdc++.so.6. A static copy in the GUI binary
+          # throws std::bad_cast from ostream on Ubuntu 24.04+ hosts.
+          if ! readelf -d "$BUILD_DIR/src/Pdc" | grep -q 'Shared library: \[libstdc++\.so\.6\]'; then
+            echo '::error::Pdc must dynamically link libstdc++.so.6'
+            exit 1
+          fi
+          for cli in pdcd simplewallet connectivity_tool; do
+            if readelf -d "$BUILD_DIR/src/$cli" | grep -q 'Shared library: \[libstdc++\.so\.6\]'; then
+              echo "::error::$cli should keep libstdc++ statically linked"
+              exit 1
+            fi
+          done
+
           "$BUILD_DIR/src/pdcd" --version
           "$BUILD_DIR/src/simplewallet" --version
           "$BUILD_DIR/src/connectivity_tool" --version
@@ -517,14 +530,18 @@ jobs:
             nss_library_args+=(--library "$library")
           done
 
-          # Keep systemd/GL/X11 on the host. systemd from the 22.04 builder
-          # breaks newer host tools (LIBSYSTEMD_254); GL/X11 belong to the GPU stack.
+          # Keep systemd/GL/X11 and libstdc++ on the host. systemd from the 22.04
+          # builder breaks newer host tools (LIBSYSTEMD_254); GL/X11 belong to the
+          # GPU stack. libstdc++ must be the host copy so Pdc, Qt, and libGL share
+          # one C++ runtime (a bundled GCC 11 libstdc++.so.6 plus the static copy
+          # previously inside Pdc throws std::bad_cast on Ubuntu 24.04+).
           host_lib_excludes=(
             'libsystemd.so*'
             'libudev.so*'
             'libselinux.so*'
             'libmount.so*'
             'libblkid.so*'
+            'libstdc++.so*'
             'libGL.so*'
             'libGLdispatch.so*'
             'libGLX.so*'
@@ -617,15 +634,15 @@ jobs:
               rm -f "$stale"
             done < <(
               find "$root" \( -type f -o -type l \) \( \
-                -name 'libsystemd.so*' -o -name 'libudev.so*' \
+                -name 'libsystemd.so*' -o -name 'libudev.so*' -o -name 'libstdc++.so*' \
               \) -print0
             )
           }
           prune_host_libs "$appdir"
 
-          if find "$appdir" \( -name 'libsystemd.so*' -o -name 'libudev.so*' \) | grep -q .; then
-            echo '::error::AppDir still contains host systemd/udev libraries after prune'
-            find "$appdir" \( -name 'libsystemd.so*' -o -name 'libudev.so*' \) -print
+          if find "$appdir" \( -name 'libsystemd.so*' -o -name 'libudev.so*' -o -name 'libstdc++.so*' \) | grep -q .; then
+            echo '::error::AppDir still contains systemd/udev or a bundled libstdc++ after prune'
+            find "$appdir" \( -name 'libsystemd.so*' -o -name 'libudev.so*' -o -name 'libstdc++.so*' \) -print
             exit 1
           fi
 
@@ -653,9 +670,9 @@ jobs:
           pushd "$extract_root" >/dev/null
           "$OUTPUT" --appimage-extract >/dev/null
           popd >/dev/null
-          if find "$extract_root/squashfs-root" \( -name 'libsystemd.so*' -o -name 'libudev.so*' \) | grep -q .; then
-            echo '::error::Packed AppImage still contains host systemd/udev libraries'
-            find "$extract_root/squashfs-root" \( -name 'libsystemd.so*' -o -name 'libudev.so*' \) -print
+          if find "$extract_root/squashfs-root" \( -name 'libsystemd.so*' -o -name 'libudev.so*' -o -name 'libstdc++.so*' \) | grep -q .; then
+            echo '::error::Packed AppImage still contains systemd/udev or a bundled libstdc++'
+            find "$extract_root/squashfs-root" \( -name 'libsystemd.so*' -o -name 'libudev.so*' -o -name 'libstdc++.so*' \) -print
             exit 1
           fi
           for library in "${nss_runtime_libraries[@]}"; do
@@ -735,7 +752,7 @@ jobs:
             echo "- Runtime baseline: ${{ matrix.baseline }} (AppImage intended for this glibc and newer)"
             echo "- CLI: \`$CLI_BASENAME.tar.bz2\`"
             echo "- GUI: \`$GUI_BASENAME.AppImage\`"
-            echo "- Newer-host notes: bundled builder NSS/NSPR + AppRun LD_LIBRARY_PATH pin; host systemd/GL/X11"
+            echo "- Newer-host notes: bundled builder NSS/NSPR + AppRun LD_LIBRARY_PATH pin; host libstdc++/systemd/GL/X11"
             echo "- Linux platform signing: not configured"
             echo "- Release checksums: GitHub shows an artifact digest; no separate checksum artifact is produced"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -807,9 +824,13 @@ jobs:
           "$appimage" --exec=simplewallet --exec-args='--version'
           "$appimage" --exec=connectivity_tool --exec-args='--version'
 
-          # GUI must stay alive under Xvfb (no immediate segfault / WebEngine abort).
+          # GUI must stay alive under Xvfb, and the backend must not die on
+          # std::bad_cast from a second libstdc++ while formatting daemon status.
+          smoke_home="$RUNNER_TEMP/pdc-smoke-home"
+          rm -rf "$smoke_home"
+          mkdir -p "$smoke_home"
           set +e
-          xvfb-run -a timeout 20s "$appimage" 2>&1 | tee gui-smoke.log
+          HOME="$smoke_home" xvfb-run -a timeout 20s "$appimage" 2>&1 | tee gui-smoke.log
           rc=${PIPESTATUS[0]}
           set -e
           # timeout -> 124 means the process was still running (success for smoke).
@@ -820,4 +841,8 @@ jobs:
             fi
             exit 1
           fi
-          echo "GUI smoke OK on ubuntu-24.04 (still running after 20s)"
+          if grep -R -F 'std::bad_cast' "$smoke_home/.PDC" gui-smoke.log; then
+            echo '::error::GUI backend threw std::bad_cast'
+            exit 1
+          fi
+          echo "GUI smoke OK on ubuntu-24.04 (still running after 20s, no std::bad_cast)"

@@ -190,6 +190,14 @@ target_link_libraries(simplewallet wallet rpc currency_core crypto common zlibst
 ENABLE_SHARED_PCH(simplewallet SIMPLEWALLET)
 ENABLE_SHARED_PCH_EXECUTABLE(simplewallet)
 
+# CLI tools do not load Qt, so they keep a private libstdc++. The GUI target
+# must not: it has to share the single libstdc++.so.6 that Qt loads.
+if(STATIC AND UNIX AND NOT APPLE)
+  foreach(pdc_cli_target daemon simplewallet connectivity_tool)
+    target_link_options(${pdc_cli_target} PRIVATE -static-libstdc++)
+  endforeach()
+endif()
+
 set_property(TARGET common crypto currency_core rpc stratum wallet PROPERTY FOLDER "libs")
 set_property(TARGET daemon simplewallet connectivity_tool PROPERTY FOLDER "prog")
 set_property(TARGET daemon PROPERTY OUTPUT_NAME "pdcd")
