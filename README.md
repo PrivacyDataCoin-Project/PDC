@@ -204,6 +204,6 @@ To build GUI application:
 
 ## Supporting project/donations
 
-PDC: @arqtras<br />
+PDC: @dev<br />
 XMR: 44xwrxeWXiCQJhvxxa5sVn6etiCoRAzHkMRJP6re2ySXXCJd4S5qvshjnyhePGFSftCjBHNKAdH5e2nZyrJgNTowBdGzRaU<br />
 
