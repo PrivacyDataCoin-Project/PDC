@@ -5359,7 +5359,10 @@ bool wallet2::is_transfer_unlocked(const transfer_details& td, bool for_pos_mini
   if (td.m_flags & WALLET_TRANSFER_DETAIL_FLAG_BLOCKED)
     return false;
 
-  if (td.m_ptx_wallet_info->m_block_height + WALLET_DEFAULT_TX_SPENDABLE_AGE > get_blockchain_current_size())
+  // Coinage is (chain_height - output_height - 1). HF4 requires coinage >= MIN_COINAGE,
+  // and WALLET_DEFAULT_TX_SPENDABLE_AGE is that minimum, so the output stays locked
+  // until it is AGE + 1 blocks behind the tip.
+  if (td.m_ptx_wallet_info->m_block_height + WALLET_DEFAULT_TX_SPENDABLE_AGE + 1 > get_blockchain_current_size())
     return false;
 
 
@@ -5714,8 +5717,59 @@ void wallet2::transfer_asset_ownership(const crypto::public_key& asset_id, const
   result_tx = ft.tx;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::burn_asset(const crypto::public_key& asset_id, uint64_t amount_to_burn, currency::finalized_tx& ft, const std::vector<currency::tx_service_attachment>& service_entries, const std::string& address_to_point/* = const std::string()*/, uint64_t native_amount_to_point/* = 0*/)
+crypto::public_key wallet2::native_burn_authority_pubkey() const
 {
+  crypto::public_key pk = AUTO_VAL_INIT(pk);
+  CHECK_AND_ASSERT_THROW_MES(epee::string_tools::hex_to_pod(P2P_MAINTAINERS_MAINNET, pk), "P2P_MAINTAINERS_MAINNET is not a public key");
+  return pk;
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::ensure_native_burn_authority(const crypto::secret_key& maintainer_key) const
+{
+  // Same pattern as a short-alias authority key: the caller supplies the secret,
+  // and it must derive the compiled maintainer pubkey. Fail before any tx is built.
+  if (maintainer_key == currency::null_skey)
+    throw std::runtime_error(std::string("native PDC burn requires the maintainer key: ") + P2P_MAINTAINERS_MAINNET);
+
+  crypto::public_key derived = AUTO_VAL_INIT(derived);
+  const bool derived_ok = crypto::secret_key_to_public_key(maintainer_key, derived);
+  if (!derived_ok || derived != native_burn_authority_pubkey())
+    throw std::runtime_error(std::string("native PDC burn is not authorized by maintainer key: ") + P2P_MAINTAINERS_MAINNET);
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::burn_native(uint64_t amount_to_burn, const crypto::secret_key& maintainer_key, currency::finalized_tx& ft)
+{
+  ensure_native_burn_authority(maintainer_key);
+
+  // Post-HF4 the explicit fee is destroyed and subtracted from already_generated_coins.
+  // A PUBLIC_BURN on the native asset id double-counts that amount and breaks the balance proof.
+  CHECK_AND_ASSERT_THROW_MES(is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM), "native burn is available after HF4, when transaction fees are removed from emission");
+  CHECK_AND_ASSERT_THROW_MES(amount_to_burn >= TX_MINIMUM_FEE, "native burn amount " << print_money_brief(amount_to_burn) << " is below the minimum fee " << print_money_brief(TX_MINIMUM_FEE));
+
+  construct_tx_param ctp = get_default_construct_tx_param();
+  ctp.fee = amount_to_burn;
+  ctp.need_at_least_1_zc = true;
+  ctp.allow_high_fee = true;
+  ctp.tx_meaning_for_logs = "native burn";
+  this->transfer(ctp, ft, true, nullptr);
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::burn_native(uint64_t amount_to_burn, const crypto::secret_key& maintainer_key, currency::transaction& result_tx)
+{
+  finalized_tx ft{};
+  burn_native(amount_to_burn, maintainer_key, ft);
+  result_tx = ft.tx;
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::burn_asset(const crypto::public_key& asset_id, uint64_t amount_to_burn, currency::finalized_tx& ft, const std::vector<currency::tx_service_attachment>& service_entries, const std::string& address_to_point/* = const std::string()*/, uint64_t native_amount_to_point/* = 0*/, const crypto::secret_key& maintainer_key/* = currency::null_skey*/)
+{
+  if (asset_id == currency::native_coin_asset_id)
+  {
+    CHECK_AND_ASSERT_THROW_MES(service_entries.empty() && address_to_point.empty() && native_amount_to_point == 0, "native PDC burn does not accept asset service entries");
+    burn_native(amount_to_burn, maintainer_key, ft);
+    return;
+  }
+
   asset_descriptor_operation asset_burn_info{};
   fill_ado_version_based_onhardfork(asset_burn_info);
   if (!is_in_hardfork_zone(ZANO_HARDFORK_05))
@@ -5760,10 +5814,10 @@ void wallet2::burn_asset(const crypto::public_key& asset_id, uint64_t amount_to_
   this->transfer(ctp, ft, true, nullptr);
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::burn_asset(const crypto::public_key& asset_id, uint64_t amount_to_burn, currency::transaction& result_tx, const std::vector<currency::tx_service_attachment>& service_entries, const std::string& address_to_point/* = const std::string()*/, uint64_t native_amount_to_point /*= 0*/)
+void wallet2::burn_asset(const crypto::public_key& asset_id, uint64_t amount_to_burn, currency::transaction& result_tx, const std::vector<currency::tx_service_attachment>& service_entries, const std::string& address_to_point/* = const std::string()*/, uint64_t native_amount_to_point /*= 0*/, const crypto::secret_key& maintainer_key/* = currency::null_skey*/)
 {
   finalized_tx ft{};
-  burn_asset(asset_id, amount_to_burn, ft, service_entries, address_to_point, native_amount_to_point);
+  burn_asset(asset_id, amount_to_burn, ft, service_entries, address_to_point, native_amount_to_point, maintainer_key);
   result_tx = ft.tx;
 }
 //----------------------------------------------------------------------------------------------------
@@ -7974,6 +8028,7 @@ bool wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
   ftp.multisig_id = ctp.multisig_id;
   ftp.spend_pub_key = m_account.get_public_address().spend_public_key;
   ftp.ado_sign_thirdparty = ctp.ado_sign_thirdparty;
+  ftp.allow_high_fee = ctp.allow_high_fee;
 
   /* TODO
   WLT_LOG_GREEN("[prepare_transaction]: get_needed_money_time: " << get_needed_money_time << " ms"
@@ -8011,7 +8066,10 @@ void wallet2::finalize_transaction(currency::finalize_tx_param& ftp, currency::f
   //TIME_MEASURE_FINISH_MS(construct_tx_time);
   THROW_IF_FALSE_WALLET_EX(r, error::tx_not_constructed, ftp.sources, ftp.prepared_destinations, ftp.unlock_time);
   uint64_t effective_fee = 0;
-  THROW_IF_FALSE_WALLET_CMN_ERR_EX(!get_tx_fee(result.tx, effective_fee) || effective_fee <= WALLET_TX_MAX_ALLOWED_FEE, "tx fee is WAY too big: " << print_money_brief(effective_fee) << ", maximum allowed is " << print_money_brief(WALLET_TX_MAX_ALLOWED_FEE) << ".");
+  if (!ftp.allow_high_fee)
+  {
+    THROW_IF_FALSE_WALLET_CMN_ERR_EX(!get_tx_fee(result.tx, effective_fee) || effective_fee <= WALLET_TX_MAX_ALLOWED_FEE, "tx fee is WAY too big: " << print_money_brief(effective_fee) << ", maximum allowed is " << print_money_brief(WALLET_TX_MAX_ALLOWED_FEE) << ".");
+  }
 
   //TIME_MEASURE_START_MS(sign_ms_input_time);
   if (ftp.multisig_id != currency::null_hash)

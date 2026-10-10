@@ -2015,7 +2015,7 @@ namespace wallet_public
 
   struct COMMAND_ASSETS_BURN
   {
-    DOC_COMMAND("Burn some owned amount of the coins for the given asset.");
+    DOC_COMMAND("Burn some owned amount of the coins for the given asset. Native PDC requires maintainer_key matching P2P_MAINTAINERS_MAINNET and is burned as a transaction fee.");
 
     struct request
     {
@@ -2025,6 +2025,7 @@ namespace wallet_public
       std::string point_tx_to_address;
       uint64_t native_amount = 0;
       std::vector<currency::tx_service_attachment> service_entries;
+      crypto::secret_key maintainer_key = currency::null_skey;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)  DOC_DSCR("Id of the asset to burn") DOC_EXMP("40fa6db923728b38962718c61b4dc3af1acaa1967479c73703e260dc3609c58d") DOC_END
@@ -2032,6 +2033,7 @@ namespace wallet_public
         KV_SERIALIZE(point_tx_to_address) DOC_DSCR("Optional, if we need this transaction to be seen by particular wallet") DOC_EXMP("Px1FR6FDrw621UVT1p34Di3MPXQQ9NRfr4hJZMnUho7z63DbKAp3Aa87P8dGZ9NY2G8j3fDwUhuUQA4xhBKp3GvY1XzvN5o64") DOC_END
         KV_SERIALIZE(native_amount) DOC_DSCR("Optional, if we need this transaction to be seen by particular wallet") DOC_EXMP(0) DOC_END
         KV_SERIALIZE(service_entries) DOC_DSCR("Optional, if we need to include service entries for burn transaction") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(maintainer_key) DOC_DSCR("Required for native PDC. Hex secret whose public key must equal P2P_MAINTAINERS_MAINNET. Ignored for a registered asset.") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 

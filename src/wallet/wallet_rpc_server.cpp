@@ -1394,8 +1394,24 @@ namespace tools
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
 
+    // Native PDC is a fee burn. It is accepted here only when maintainer_key matches
+    // P2P_MAINTAINERS_MAINNET. A registered asset ignores that field and stays PUBLIC_BURN.
+    if (req.asset_id == currency::native_coin_asset_id)
+    {
+      try
+      {
+        w.get_wallet()->ensure_native_burn_authority(req.maintainer_key);
+      }
+      catch (const std::exception& e)
+      {
+        er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+        er.message = e.what();
+        return false;
+      }
+    }
+
     currency::finalized_tx ft{};
-    w.get_wallet()->burn_asset(req.asset_id, req.burn_amount, ft, req.service_entries, req.point_tx_to_address, req.native_amount);
+    w.get_wallet()->burn_asset(req.asset_id, req.burn_amount, ft, req.service_entries, req.point_tx_to_address, req.native_amount, req.maintainer_key);
     res.tx_id = ft.tx_id;
 
     return true;
