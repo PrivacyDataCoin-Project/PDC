@@ -214,7 +214,7 @@ call_app()
 
   rc=$?
   if [ $rc -ne 0 ]; then
-    echo $'\n\n\x1b[1mIf Pdc fails to launch:\n\x1b[2m   sudo apt-get install libxcb-xinerama0 libgl1 libx11-6 libxcb1\n\x1b[1mOn systems where FUSE is unavailable, try:\n\x1b[2m   APPIMAGE_EXTRACT_AND_RUN=1 ./pdc-linux-*-gui-*.AppImage\n\n'
+    echo $'\n\n\x1b[1mIf Pdc fails to launch, install host GL/X11 libraries (not bundled):\n\x1b[2m   sudo apt-get install libegl1 libgl1 libopengl0 libxcb-xinerama0 libx11-6 libxcb1\n\x1b[1mOn systems where FUSE is unavailable, try:\n\x1b[2m   APPIMAGE_EXTRACT_AND_RUN=1 ./pdc-linux-*-gui-*.AppImage\n\n'
   fi
 
   popd >/dev/null
