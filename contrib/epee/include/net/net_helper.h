@@ -497,6 +497,7 @@ namespace epee
             if (ec == boost::asio::error::eof)
             {
               LOG_PRINT_L4("Connection err_code eof.");
+              m_connected = false;
               //connection closed there, empty
               return true;
             }
