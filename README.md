@@ -219,7 +219,7 @@ To build GUI application:
 - **TypeScript SDK** (`pdc_web3`): Private repo `PrivacyDataCoin-Project/pdc_web3` (branch `dev`) — Wallet RPC, Daemon RPC, Extension bridge
 - **Native Library** (`pdc_native_lib`): Private repo `PrivacyDataCoin-Project/pdc_native_lib` (branch `dev`) — Multi-platform Plain Wallet API (iOS, Android, Linux, macOS, Windows)
 - **Plain Wallet API Spec**: [`PLAIN_WALLET_API.md`](PLAIN_WALLET_API.md)
-- **Documentation**: https://privacydatacoin.com/pdcdocs/ (source: private repo `PrivacyDataCoin-Project/pdc_docs`)
+- **Documentation**: https://privacydatacoin.com/pdcdocs/ (source: [PrivacyDataCoin-Project/pdcdocs](https://github.com/PrivacyDataCoin-Project/pdcdocs))
 
 ## Supporting project/donations
 
