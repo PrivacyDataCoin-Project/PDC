@@ -12,7 +12,7 @@
 set -euo pipefail
 
 ARQ_NAME="ArqTras"
-ARQ_EMAIL="33489188+ArqTras@users.noreply.github.com"
+ARQ_EMAIL="biuro@ar-net.info"
 TOKEN="${ARQTRAS_GITHUB_TOKEN:-${GH_ACTIONS_PAT:-}}"
 
 export GIT_AUTHOR_NAME="$ARQ_NAME"
