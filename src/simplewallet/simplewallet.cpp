@@ -5,6 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <cstdlib>
+#include <fstream>
 #if defined(WIN32)
   #include <crtdbg.h>
 #endif
@@ -130,6 +131,7 @@ namespace
   const command_line::arg_descriptor<std::string>   arg_daemon_address  ("daemon-address", "Use daemon instance at <host>:<port>", "");
   const command_line::arg_descriptor<std::string>   arg_daemon_host  ("daemon-host", "Use daemon instance at host <arg> instead of localhost", "");
   const command_line::arg_descriptor<std::string>   arg_password  ("password", "Wallet password");
+  const command_line::arg_descriptor<std::string>   arg_password_file ("password-file", "Read wallet password from file (preferred for daemons; avoids argv exposure)");
   const command_line::arg_descriptor<bool>          arg_dont_refresh  ( "no-refresh", "Do not refresh after load");
   const command_line::arg_descriptor<bool>          arg_dont_set_date  ( "no-set-creation-date", "Do not set wallet creation date", false);
   const command_line::arg_descriptor<int>           arg_daemon_port  ("daemon-port", "Use daemon instance at port <arg> instead of default", 0);
@@ -436,7 +438,22 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     m_daemon_address = std::string("http://") + m_daemon_host + ":" + std::to_string(m_daemon_port);
 
   tools::password_container pwd_container;
-  if (command_line::has_arg(vm, arg_password))
+  if (command_line::has_arg(vm, arg_password_file) && !command_line::get_arg(vm, arg_password_file).empty())
+  {
+    std::string pw_path = command_line::get_arg(vm, arg_password_file);
+    std::ifstream pw_in(pw_path.c_str());
+    if (!pw_in)
+    {
+      fail_msg_writer() << "failed to open password-file: " << pw_path;
+      return false;
+    }
+    std::string pw;
+    std::getline(pw_in, pw);
+    while (!pw.empty() && (pw.back() == '\r' || pw.back() == '\n'))
+      pw.pop_back();
+    pwd_container.password(std::move(pw));
+  }
+  else if (command_line::has_arg(vm, arg_password))
   {
     pwd_container.password(command_line::get_arg(vm, arg_password));
   }
@@ -3236,6 +3253,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_generate_new_wallet);
   command_line::add_arg(desc_params, arg_generate_new_auditable_wallet);
   command_line::add_arg(desc_params, arg_password);
+  command_line::add_arg(desc_params, arg_password_file);
   command_line::add_arg(desc_params, arg_daemon_address);
   command_line::add_arg(desc_params, arg_daemon_host);
   command_line::add_arg(desc_params, arg_daemon_port);
@@ -3370,7 +3388,22 @@ int main(int argc, char* argv[])
     }
 
     tools::password_container pwd_container;
-    if (command_line::has_arg(vm, arg_password))
+    if (command_line::has_arg(vm, arg_password_file) && !command_line::get_arg(vm, arg_password_file).empty())
+    {
+      std::string pw_path = command_line::get_arg(vm, arg_password_file);
+      std::ifstream pw_in(pw_path.c_str());
+      if (!pw_in)
+      {
+        LOG_ERROR("failed to open password-file: " << pw_path);
+        return EXIT_FAILURE;
+      }
+      std::string pw;
+      std::getline(pw_in, pw);
+      while (!pw.empty() && (pw.back() == '\r' || pw.back() == '\n'))
+        pw.pop_back();
+      pwd_container.password(std::move(pw));
+    }
+    else if (command_line::has_arg(vm, arg_password))
     {
       pwd_container.password(command_line::get_arg(vm, arg_password));
     }
