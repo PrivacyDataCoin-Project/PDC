@@ -1700,7 +1700,7 @@ namespace wallet_public
     struct request
     {
       std::string buff; //base64 encoded data
-      
+
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(buff)        DOC_DSCR("base64 encoded data message to be signed")    DOC_EXMP("ZGNjc2Ztc2xrZm12O2xrZm12OydlbGtmdm0nbGtmbXY=")  DOC_END
       END_KV_SERIALIZE_MAP()
@@ -1715,6 +1715,35 @@ namespace wallet_public
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_POD_AS_HEX_STRING(sig)   DOC_DSCR("Signature represented as a hexadecimal string") DOC_EXMP("97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc") DOC_END
         KV_SERIALIZE_POD_AS_HEX_STRING(pkey)  DOC_DSCR("Wallet's public key represented as a hexadecimal string") DOC_EXMP("97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_VERIFY_MESSAGE
+  {
+    DOC_COMMAND("Verify a signature over base64-encoded data against a spend public key (no wallet ownership required). Optional address binds spend key to PDC address.")
+
+    struct request
+    {
+      std::string buff; // base64 encoded data
+      crypto::signature sig = currency::null_sig;
+      crypto::public_key pkey = currency::null_pkey;
+      std::string address; // optional PDC address — must decode to the same spend public key
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(buff)                       DOC_DSCR("base64 encoded data message that was signed") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(sig)      DOC_DSCR("Signature hex") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(pkey)     DOC_DSCR("Spend public key hex that produced the signature") DOC_END
+        KV_SERIALIZE(address)                    DOC_DSCR("Optional PDC address; when set, spend key must match") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      bool good = false;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(good) DOC_DSCR("True when address (if given) matches pkey and crypto::check_signature succeeds") DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };

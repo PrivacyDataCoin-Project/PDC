@@ -1493,10 +1493,41 @@ namespace tools
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_sign_message(const wallet_public::COMMAND_SIGN_MESSAGE::request& req, wallet_public::COMMAND_SIGN_MESSAGE::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
-    WALLET_RPC_BEGIN_TRY_ENTRY();    
+    WALLET_RPC_BEGIN_TRY_ENTRY();
     std::string buff = epee::string_encoding::base64_decode(req.buff);
     w.get_wallet()->sign_buffer(buff, res.sig);
     res.pkey = w.get_wallet()->get_account().get_public_address().spend_public_key;
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_verify_message(const wallet_public::COMMAND_VERIFY_MESSAGE::request& req, wallet_public::COMMAND_VERIFY_MESSAGE::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+    res.good = false;
+    if (req.pkey == currency::null_pkey)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+      er.message = "pkey is required";
+      return false;
+    }
+    if (!req.address.empty())
+    {
+      currency::account_public_address addr = AUTO_VAL_INIT(addr);
+      if (!currency::get_account_address_from_str(addr, req.address))
+      {
+        er.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
+        er.message = "failed to parse address";
+        return false;
+      }
+      if (addr.spend_public_key != req.pkey)
+      {
+        // address does not own this spend key — fail closed without error object
+        return true;
+      }
+    }
+    std::string buff = epee::string_encoding::base64_decode(req.buff);
+    res.good = w.get_wallet()->validate_sign(buff, req.sig, req.pkey);
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
