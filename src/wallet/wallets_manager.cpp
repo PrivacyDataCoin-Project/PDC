@@ -618,6 +618,18 @@ std::string wallets_manager::setup_wallet_rpc(const std::string& jwt_secret)
   return WALLET_RPC_STATUS_OK;
 }
 
+std::string wallets_manager::select_wallet_rpc(uint64_t wallet_id)
+{
+#ifndef MOBILE_WALLET_BUILD
+  if (!on_mw_select_wallet(wallet_id))
+    return API_RETURN_CODE_WALLET_WRONG_ID;
+  return API_RETURN_CODE_OK;
+#else
+  (void)wallet_id;
+  return API_RETURN_CODE_FAIL;
+#endif
+}
+
 bool wallets_manager::deinit_local_daemon()
 {
 #ifndef MOBILE_WALLET_BUILD
