@@ -217,25 +217,34 @@ namespace tools
 
     auto it = std::find_if(query_info.m_header_info.m_etc_fields.begin(), query_info.m_header_info.m_etc_fields.end(), [](const auto& element)
                            { return element.first == ZANO_ACCESS_TOKEN; });
-    if(it == query_info.m_header_info.m_etc_fields.end())
+    if(it == query_info.m_header_info.m_etc_fields.end() || it->second.empty())
+      return false;
+
+    // Snapshot secret under the same lock as salt ops so concurrent setup_wallet_rpc
+    // / multi-threaded daemon RPC (core_rpc_server::run(2)) cannot race std::set.
+    std::string jwt_secret;
+    {
+      std::lock_guard<std::mutex> lock(m_jwt_salts_lock);
+      jwt_secret = m_jwt_secret;
+    }
+    if(jwt_secret.empty())
       return false;
     
     try
     {
-      if(m_jwt_used_salts.get_set().size() > JWT_TOKEN_OVERWHELM_LIMIT)
-      {
-        throw std::runtime_error("Salt is overwhelmed");
-      }
-
       auto decoded = jwt::decode(it->second, [](const std::string& str)
                                  { return jwt::base::decode<jwt::alphabet::base64>(jwt::base::pad<jwt::alphabet::base64>(str)); });
 
 
-      auto verifier = jwt::verify().allow_algorithm(jwt::algorithm::hs256 { m_jwt_secret });
+      auto verifier = jwt::verify().allow_algorithm(jwt::algorithm::hs256 { jwt_secret });
 
       verifier.verify(decoded);
       std::string body_hash     = decoded.get_payload_claim(JWT_TOKEN_CLAIM_NAME_BODY_HASH).as_string();
       std::string salt      = decoded.get_payload_claim(JWT_TOKEN_CLAIM_NAME_SALT).as_string();
+      if(body_hash.empty() || salt.empty())
+      {
+        throw std::runtime_error("Missing body_hash or salt claim");
+      }
       crypto::hash jwt_claim_sha256 = currency::null_hash;
       epee::string_tools::hex_to_pod(body_hash, jwt_claim_sha256);
       crypto::hash sha256 = crypto::sha256_hash(query_info.m_body.data(), query_info.m_body.size());
@@ -243,14 +252,22 @@ namespace tools
       {
         throw std::runtime_error("Body hash missmatch");
       }
-      if(m_jwt_used_salts.get_set().find(salt) != m_jwt_used_salts.get_set().end())
-      {
-        throw std::runtime_error("Salt reused");
-      }
 
-      uint64_t ticks_now = epee::misc_utils::get_tick_count();
-      m_jwt_used_salts.add(salt, ticks_now + JWT_TOKEN_EXPIRATION_MAXIMUM);
-      m_jwt_used_salts.remove_if_expiration_less_than(ticks_now);
+      {
+        std::lock_guard<std::mutex> lock(m_jwt_salts_lock);
+        if(m_jwt_used_salts.get_set().size() > JWT_TOKEN_OVERWHELM_LIMIT)
+        {
+          throw std::runtime_error("Salt is overwhelmed");
+        }
+        if(m_jwt_used_salts.get_set().find(salt) != m_jwt_used_salts.get_set().end())
+        {
+          throw std::runtime_error("Salt reused");
+        }
+
+        uint64_t ticks_now = epee::misc_utils::get_tick_count();
+        m_jwt_used_salts.add(salt, ticks_now + JWT_TOKEN_EXPIRATION_MAXIMUM);
+        m_jwt_used_salts.remove_if_expiration_less_than(ticks_now);
+      }
 
       LOG_PRINT_L3("JWT token OK");
       return true;
@@ -260,15 +277,22 @@ namespace tools
       LOG_ERROR("Invalid JWT token: " << e.what());
       return false;
     }
-
-
-    return false;
+    catch(...)
+    {
+      LOG_ERROR("Invalid JWT token: unknown exception");
+      return false;
+    }
 
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::handle_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response, epee::net_utils::connection_context_base& conn_context, bool& call_found, documentation& docs)
   {
-    if (m_jwt_secret.size() && conn_context.m_connection_id != RPC_INTERNAL_UI_CONTEXT)
+    bool jwt_auth_required = false;
+    {
+      std::lock_guard<std::mutex> lock(m_jwt_salts_lock);
+      jwt_auth_required = !m_jwt_secret.empty();
+    }
+    if (jwt_auth_required && conn_context.m_connection_id != RPC_INTERNAL_UI_CONTEXT)
     {
       if (!auth_http_request(query_info, response, conn_context))
       {
@@ -305,11 +329,14 @@ namespace tools
   //------------------------------------------------------------------------------------------------------------------------------
   void wallet_rpc_server::set_jwt_secret(const std::string& jwt)
   {
+    std::lock_guard<std::mutex> lock(m_jwt_salts_lock);
     m_jwt_secret = jwt;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   const std::string& wallet_rpc_server::get_jwt_secret()
   {
+    // Callers that need a stable copy across threads should snapshot under their own
+    // synchronization; auth_http_request already copies under m_jwt_salts_lock.
     return m_jwt_secret;
   }
   //------------------------------------------------------------------------------------------------------------------------------

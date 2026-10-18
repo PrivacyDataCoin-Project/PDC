@@ -6,6 +6,7 @@
 
 #pragma  once 
 
+#include <mutex>
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/variables_map.hpp>
 #include "net/http_server_impl_base.h"
@@ -268,6 +269,8 @@ namespace tools
     bool m_deaf;
     uint64_t m_last_wallet_store_height;
     std::string m_jwt_secret;
+    // GUI daemon RPC runs with 2 worker threads; salt bookkeeping must be serialized.
+    mutable std::mutex m_jwt_salts_lock;
     epee::misc_utils::expirating_set<std::string, uint64_t> m_jwt_used_salts;
   };
 
