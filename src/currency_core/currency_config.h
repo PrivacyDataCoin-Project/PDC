@@ -112,12 +112,16 @@
 #define CURRENCY_MEMPOOL_TX_LIVETIME                    345600 //seconds, 4 days
 
 
+// Mainnet maintainer pubkey. Native PDC burn always authorizes against this key,
+// including TESTNET builds where P2P_MAINTAINERS_PUB_KEY is a different key.
+#define P2P_MAINTAINERS_MAINNET                         "21dcfd0163de6e177b6215da3daa459348e30b1e359b0884a20ae609a07b592d"
+
 #ifndef TESTNET
 #define P2P_DEFAULT_PORT                                19121
 #define RPC_DEFAULT_PORT                                19211
 #define STRATUM_DEFAULT_PORT                            19777
 #define P2P_NETWORK_ID_TESTNET_FLAG                     0
-#define P2P_MAINTAINERS_PUB_KEY                         "21dcfd0163de6e177b6215da3daa459348e30b1e359b0884a20ae609a07b592d"
+#define P2P_MAINTAINERS_PUB_KEY                         P2P_MAINTAINERS_MAINNET
 #define DIFFICULTY_POS_STARTER                          1
 #else 
 #define P2P_DEFAULT_PORT                                (19211 + CURRENCY_FORMATION_VERSION)

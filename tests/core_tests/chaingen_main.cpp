@@ -1151,6 +1151,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(cumulative_difficulty_adjustment_test_alt);
     GENERATE_AND_PLAY(prun_ring_signatures);
     GENERATE_AND_PLAY(gen_simple_chain_001);
+    GENERATE_AND_PLAY_HF(native_pdc_fee_burn, "4");
     GENERATE_AND_PLAY(one_block);
     GENERATE_AND_PLAY(gen_ring_signature_1);
     GENERATE_AND_PLAY(gen_ring_signature_2);

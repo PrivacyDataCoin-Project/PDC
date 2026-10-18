@@ -6,6 +6,7 @@
 
 #pragma  once 
 
+#include <mutex>
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/variables_map.hpp>
 #include "net/http_server_impl_base.h"
@@ -173,6 +174,7 @@ namespace tools
 
         //basic crypto operations
         MAP_JON_RPC_WE("sign_message",                        on_sign_message,                  wallet_public::COMMAND_SIGN_MESSAGE)
+        MAP_JON_RPC_WE("verify_message",                      on_verify_message,                wallet_public::COMMAND_VERIFY_MESSAGE)
         MAP_JON_RPC_WE("encrypt_data",                        on_encrypt_data,                  wallet_public::COMMAND_ENCRYPT_DATA)
         MAP_JON_RPC_WE("decrypt_data",                        on_decrypt_data,                  wallet_public::COMMAND_DECRYPT_DATA)
 
@@ -243,6 +245,7 @@ namespace tools
     bool on_mw_select_wallet(const wallet_public::COMMAND_MW_SELECT_WALLET::request& req, wallet_public::COMMAND_MW_SELECT_WALLET::response& res, epee::json_rpc::error& er, connection_context& cntx);
 
     bool on_sign_message(const wallet_public::COMMAND_SIGN_MESSAGE::request& req, wallet_public::COMMAND_SIGN_MESSAGE::response& res, epee::json_rpc::error& er, connection_context& cntx);
+    bool on_verify_message(const wallet_public::COMMAND_VERIFY_MESSAGE::request& req, wallet_public::COMMAND_VERIFY_MESSAGE::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_encrypt_data(const wallet_public::COMMAND_ENCRYPT_DATA::request& req, wallet_public::COMMAND_ENCRYPT_DATA::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_decrypt_data(const wallet_public::COMMAND_DECRYPT_DATA::request& req, wallet_public::COMMAND_DECRYPT_DATA::response& res, epee::json_rpc::error& er, connection_context& cntx);
 
@@ -266,6 +269,8 @@ namespace tools
     bool m_deaf;
     uint64_t m_last_wallet_store_height;
     std::string m_jwt_secret;
+    // GUI daemon RPC runs with 2 worker threads; salt bookkeeping must be serialized.
+    mutable std::mutex m_jwt_salts_lock;
     epee::misc_utils::expirating_set<std::string, uint64_t> m_jwt_used_salts;
   };
 

@@ -151,6 +151,8 @@ public:
   std::string get_tx_pool_info(currency::COMMAND_RPC_GET_POOL_INFO::response& res);
   std::string export_wallet_history(const view::export_wallet_info& ewi);
   std::string setup_wallet_rpc(const std::string& jwt_secret);
+  // Select which opened wallet Companion / JWT wallet RPC addresses.
+  std::string select_wallet_rpc(uint64_t wallet_id);
   std::string set_remote_node_url(const std::string& url);
   bool is_remote_node_mode() const { return m_remote_node_mode; }
 

@@ -8,3 +8,15 @@ Thumbs.db
 .idea
 .vs/*
 utils/*.SECRET.txt
+
+# Local trade dev scripts (kept private, do not push)
+start-pdc-trade.py
+stop-pdc-trade.sh
+
+# Private PDC ecosystem repos (separate git repos, not submodules)
+pdc_web3/
+pdc_native_lib/
+pdc_utils_js/
+pdc_trade_frontend/
+pdc_trade_backend/
+pdc_atomic_swap_example/

@@ -5,6 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <cstdlib>
+#include <fstream>
 #if defined(WIN32)
   #include <crtdbg.h>
 #endif
@@ -130,6 +131,7 @@ namespace
   const command_line::arg_descriptor<std::string>   arg_daemon_address  ("daemon-address", "Use daemon instance at <host>:<port>", "");
   const command_line::arg_descriptor<std::string>   arg_daemon_host  ("daemon-host", "Use daemon instance at host <arg> instead of localhost", "");
   const command_line::arg_descriptor<std::string>   arg_password  ("password", "Wallet password");
+  const command_line::arg_descriptor<std::string>   arg_password_file ("password-file", "Read wallet password from file (preferred for daemons; avoids argv exposure)");
   const command_line::arg_descriptor<bool>          arg_dont_refresh  ( "no-refresh", "Do not refresh after load");
   const command_line::arg_descriptor<bool>          arg_dont_set_date  ( "no-set-creation-date", "Do not set wallet creation date", false);
   const command_line::arg_descriptor<int>           arg_daemon_port  ("daemon-port", "Use daemon instance at port <arg> instead of default", 0);
@@ -333,12 +335,13 @@ simple_wallet::simple_wallet()
 
   m_cmd_binder.set_handler("sign_transfer", boost::bind(&simple_wallet::sign_transfer, this,ph::_1), "sign_transfer <unsgined_tx_file> <signed_tx_file> - sign unsigned tx from a watch-only wallet");
   m_cmd_binder.set_handler("submit_transfer", boost::bind(&simple_wallet::submit_transfer, this,ph::_1), "submit_transfer <signed_tx_file> - broadcast signed tx");
-  m_cmd_binder.set_handler("export_history", boost::bind(&simple_wallet::submit_transfer, this,ph::_1), "Export transaction history in CSV file");
+  m_cmd_binder.set_handler("export_history", boost::bind(&simple_wallet::export_recent_transfers, this,ph::_1), "Export transaction history in CSV file");
   m_cmd_binder.set_handler("tor_enable", boost::bind(&simple_wallet::tor_enable, this, ph::_1), "Enable relaying transactions over TOR network(enabled by default)");
   m_cmd_binder.set_handler("tor_disable", boost::bind(&simple_wallet::tor_disable, this, ph::_1), "Enable relaying transactions over TOR network(enabled by default)");
   m_cmd_binder.set_handler("deploy_new_asset", boost::bind(&simple_wallet::deploy_new_asset, this, ph::_1), "deploy_new_asset <json_filename> - Deploys new asset in the network, with current wallet as a maintainer");
   m_cmd_binder.set_handler("emit_asset", boost::bind(&simple_wallet::emit_asset, this, ph::_1), "emit_asset <asset_id> <amount> - Emmit more coins for the asset, possible only if current wallet is a maintainer for the asset");
-  m_cmd_binder.set_handler("burn_asset", boost::bind(&simple_wallet::burn_asset, this, ph::_1), "burn_asset <asset_id> <amount> - Burn coins for the asset, possible only if current wallet is a maintainer for the asset AND possess given amount of coins to burn");
+  m_cmd_binder.set_handler("burn", boost::bind(&simple_wallet::burn, this, ph::_1), "burn <amount> <maintainer_key> - Burn native PDC as the transaction fee. maintainer_key is the hex secret that must match P2P_MAINTAINERS_MAINNET");
+  m_cmd_binder.set_handler("burn_asset", boost::bind(&simple_wallet::burn_asset, this, ph::_1), "burn_asset <asset_id> <amount> - Burn coins of a registered asset. Native PDC is not accepted here; use burn <amount> <maintainer_key>");
   m_cmd_binder.set_handler("update_asset", boost::bind(&simple_wallet::update_asset, this, ph::_1), "update_asset <asset_id> <path_to_metadata_file> - Update asset descriptor's metadata, possible only if current wallet is a maintainer for the asset");
   m_cmd_binder.set_handler("transfer_asset_ownership", boost::bind(&simple_wallet::transfer_asset_ownership, this, ph::_1), "transfer_asset_ownership <asset_id> <new_owner_public_key> - Update asset descriptor's owner field, so the asset ownership is transfered to new owner");
 
@@ -435,7 +438,22 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     m_daemon_address = std::string("http://") + m_daemon_host + ":" + std::to_string(m_daemon_port);
 
   tools::password_container pwd_container;
-  if (command_line::has_arg(vm, arg_password))
+  if (command_line::has_arg(vm, arg_password_file) && !command_line::get_arg(vm, arg_password_file).empty())
+  {
+    std::string pw_path = command_line::get_arg(vm, arg_password_file);
+    std::ifstream pw_in(pw_path.c_str());
+    if (!pw_in)
+    {
+      fail_msg_writer() << "failed to open password-file: " << pw_path;
+      return false;
+    }
+    std::string pw;
+    std::getline(pw_in, pw);
+    while (!pw.empty() && (pw.back() == '\r' || pw.back() == '\n'))
+      pw.pop_back();
+    pwd_container.password(std::move(pw));
+  }
+  else if (command_line::has_arg(vm, arg_password))
   {
     pwd_container.password(command_line::get_arg(vm, arg_password));
   }
@@ -2227,6 +2245,44 @@ bool simple_wallet::emit_asset(const std::vector<std::string> &args)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+bool simple_wallet::burn(const std::vector<std::string> &args)
+{
+  CONFIRM_WITH_PASSWORD();
+  SIMPLE_WALLET_BEGIN_TRY_ENTRY();
+  if (args.size() != 2)
+  {
+    fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected: burn <amount> <maintainer_key>";
+    return true;
+  }
+
+  uint64_t amount = 0;
+  if (!parse_amount(args[0], amount, CURRENCY_DISPLAY_DECIMAL_POINT) || amount == 0)
+  {
+    fail_msg_writer() << "Failed to read amount: " << args[0];
+    return true;
+  }
+  if (amount < TX_MINIMUM_FEE)
+  {
+    fail_msg_writer() << "amount " << print_money_brief(amount) << " is below the minimum fee " << print_money_brief(TX_MINIMUM_FEE);
+    return true;
+  }
+
+  crypto::secret_key maintainer_key = currency::null_skey;
+  if (!epee::string_tools::parse_tpod_from_hex_string(args[1], maintainer_key) || maintainer_key == currency::null_skey)
+  {
+    fail_msg_writer() << "Failed to parse maintainer key";
+    return true;
+  }
+
+  currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
+  m_wallet->burn_native(amount, maintainer_key, result_tx);
+  success_msg_writer(true) << "Burned " << print_money_brief(amount) << " native PDC as tx fee in " << get_transaction_hash(result_tx)
+    << " (unconfirmed). The amount leaves emission the same way as a post-HF4 transaction fee.";
+
+  SIMPLE_WALLET_CATCH_TRY_ENTRY();
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
 bool simple_wallet::burn_asset(const std::vector<std::string> &args)
 {
   CONFIRM_WITH_PASSWORD();
@@ -2241,6 +2297,11 @@ bool simple_wallet::burn_asset(const std::vector<std::string> &args)
   if (!r)
   {
     fail_msg_writer() << "Failed to load asset id: " << args[0];
+    return true;
+  }
+  if (asset_id == currency::native_coin_asset_id)
+  {
+    fail_msg_writer() << "native PDC burn is only available via burn <amount> <maintainer_key>";
     return true;
   }
 
@@ -3192,6 +3253,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_generate_new_wallet);
   command_line::add_arg(desc_params, arg_generate_new_auditable_wallet);
   command_line::add_arg(desc_params, arg_password);
+  command_line::add_arg(desc_params, arg_password_file);
   command_line::add_arg(desc_params, arg_daemon_address);
   command_line::add_arg(desc_params, arg_daemon_host);
   command_line::add_arg(desc_params, arg_daemon_port);
@@ -3326,7 +3388,22 @@ int main(int argc, char* argv[])
     }
 
     tools::password_container pwd_container;
-    if (command_line::has_arg(vm, arg_password))
+    if (command_line::has_arg(vm, arg_password_file) && !command_line::get_arg(vm, arg_password_file).empty())
+    {
+      std::string pw_path = command_line::get_arg(vm, arg_password_file);
+      std::ifstream pw_in(pw_path.c_str());
+      if (!pw_in)
+      {
+        LOG_ERROR("failed to open password-file: " << pw_path);
+        return EXIT_FAILURE;
+      }
+      std::string pw;
+      std::getline(pw_in, pw);
+      while (!pw.empty() && (pw.back() == '\r' || pw.back() == '\n'))
+        pw.pop_back();
+      pwd_container.password(std::move(pw));
+    }
+    else if (command_line::has_arg(vm, arg_password))
     {
       pwd_container.password(command_line::get_arg(vm, arg_password));
     }

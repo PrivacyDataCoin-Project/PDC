@@ -202,8 +202,27 @@ To build GUI application:
 <br />
 <br />
 
+## 📱 Mobile Wallet
+
+- **iOS TestFlight**: [PrivacyDataCoin TestFlight](https://testflight.apple.com/join/PDC_WALLET) *(requires invitation)*
+- **Android**: [Google Play Internal Testing](https://play.google.com/apps/testing/com.privacydatacoin.wallet) *(requires opt-in)*
+- **Source**: `PrivacyDataCoin-Project/pdcwallet-ios` (private repository)
+
+## 🔍 Block Explorer
+
+- **Mainnet**: https://explorer.privacydatacoin.com
+- **Testnet**: https://testnet.explorer.privacydatacoin.com
+- **Source Code**: https://github.com/PrivacyDataCoin-Project/pdc-explorer
+
+## 🛠️ Developer Resources
+
+- **TypeScript SDK** (`pdc_web3`): Private repo `PrivacyDataCoin-Project/pdc_web3` (branch `dev`) — Wallet RPC, Daemon RPC, Extension bridge
+- **Native Library** (`pdc_native_lib`): Private repo `PrivacyDataCoin-Project/pdc_native_lib` (branch `dev`) — Multi-platform Plain Wallet API (iOS, Android, Linux, macOS, Windows)
+- **Plain Wallet API Spec**: [`PLAIN_WALLET_API.md`](PLAIN_WALLET_API.md)
+- **Documentation**: https://privacydatacoin.com/pdcdocs/ (source: [PrivacyDataCoin-Project/pdcdocs](https://github.com/PrivacyDataCoin-Project/pdcdocs))
+
 ## Supporting project/donations
 
-PDC: @dev<br />
+PDC: @arqtras<br />
 XMR: 44xwrxeWXiCQJhvxxa5sVn6etiCoRAzHkMRJP6re2ySXXCJd4S5qvshjnyhePGFSftCjBHNKAdH5e2nZyrJgNTowBdGzRaU<br />
 

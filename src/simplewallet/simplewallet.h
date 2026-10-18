@@ -96,6 +96,7 @@ namespace currency
     bool remove_custom_asset_id(const std::vector<std::string> &args);
     bool emit_asset(const std::vector<std::string> &args);
     bool burn_asset(const std::vector<std::string> &args);
+    bool burn(const std::vector<std::string> &args);
     bool update_asset(const std::vector<std::string> &args);
     bool transfer_asset_ownership(const std::vector<std::string>& args);
     //----------------------------------------------------------------------------------------------------

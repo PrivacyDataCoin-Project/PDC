@@ -110,18 +110,55 @@ jobs:
       - name: Install NASM
         if: steps.deps-cache.outputs.cache-hit != 'true' && matrix.arch == 'x64'
         run: |
-          choco install nasm --version=$env:NASM_VERSION --allow-downgrade --yes --no-progress
-          if ($LASTEXITCODE -ne 0) {
-            throw "Chocolatey failed to install NASM $env:NASM_VERSION"
+          # Chocolatey package id uses 2.16.3; upstream release tag is 2.16.03.
+          $nasmRelease = if ($env:NASM_VERSION -match '^(\d+)\.(\d+)\.(\d+)$') {
+            '{0}.{1}.{2:D2}' -f [int]$Matches[1], [int]$Matches[2], [int]$Matches[3]
+          } else {
+            $env:NASM_VERSION
+          }
+          $nasmPath = Join-Path $env:ProgramFiles 'NASM\nasm.exe'
+          $installed = $false
+
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            Write-Host "Chocolatey NASM attempt $attempt/3 (version $($env:NASM_VERSION))"
+            choco install nasm --version=$env:NASM_VERSION --allow-downgrade --yes --no-progress
+            if ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $nasmPath -PathType Leaf)) {
+              $installed = $true
+              break
+            }
+            Start-Sleep -Seconds (5 * $attempt)
           }
 
-          $nasmPath = Join-Path $env:ProgramFiles 'NASM\nasm.exe'
+          if (-not $installed) {
+            Write-Host "Chocolatey unavailable; downloading NASM $nasmRelease from nasm.us"
+            $zip = Join-Path $env:RUNNER_TEMP "nasm-$nasmRelease-win64.zip"
+            $extract = Join-Path $env:RUNNER_TEMP "nasm-$nasmRelease"
+            $url = "https://www.nasm.us/pub/nasm/releasebuilds/$nasmRelease/win64/nasm-$nasmRelease-win64.zip"
+            & curl.exe --fail --location --retry 5 --retry-delay 3 --output $zip $url
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to download NASM from $url"
+            }
+            if (Test-Path -LiteralPath $extract) {
+              Remove-Item -LiteralPath $extract -Recurse -Force
+            }
+            Expand-Archive -LiteralPath $zip -DestinationPath $extract -Force
+            $downloaded = Get-ChildItem -Path $extract -Filter nasm.exe -Recurse |
+              Select-Object -First 1
+            if (-not $downloaded) {
+              throw "nasm.exe missing from downloaded archive"
+            }
+            $destDir = Join-Path $env:RUNNER_TEMP 'nasm-bin'
+            New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+            Copy-Item -LiteralPath (Join-Path $downloaded.DirectoryName '*') -Destination $destDir -Force
+            $nasmPath = Join-Path $destDir 'nasm.exe'
+          }
+
           if (-not (Test-Path -LiteralPath $nasmPath -PathType Leaf)) {
             throw "nasm.exe was not found after installation"
           }
           $nasmVersion = (& $nasmPath -v) -join ' '
-          if ($LASTEXITCODE -ne 0 -or $nasmVersion -notmatch '\b2\.16\.03\b') {
-            throw "Expected NASM 2.16.03, got: $nasmVersion"
+          if ($LASTEXITCODE -ne 0 -or $nasmVersion -notmatch [regex]::Escape($nasmRelease)) {
+            throw "Expected NASM $nasmRelease, got: $nasmVersion"
           }
           Split-Path -Parent $nasmPath |
             Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append

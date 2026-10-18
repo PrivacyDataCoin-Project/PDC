@@ -117,6 +117,7 @@ public slots:
   QString get_log_file(const QString& param);
   QString open_url_in_browser(const QString& param);
   QString setup_jwt_wallet_rpc(const QString& param);
+  QString select_wallet_rpc(const QString& param);
 
   void trayIconActivated(QSystemTrayIcon::ActivationReason reason);
   void tray_quit_requested(const QString& param);

@@ -1,0 +1,16 @@
+{
+  "assets": [
+    {
+      "asset_id": "c2bf0410873b49ec7e7dd19d62bca9625d80cd3123670a67b48d997d3127426d",
+      "total_max_supply": 2100000000000000,
+      "current_supply": 18382,
+      "decimal_point": 8,
+      "ticker": "BTCX",
+      "full_name": "Wrapped Bitcoin",
+      "meta_info": "Confidential Layer-style wrapped BTC on PDC; 1:1 peg via bridge",
+      "owner": "50bb21f31675bfa40947586a0d01f13b8510c7143e6f8770e951c53bc8587abb",
+      "hidden_supply": false
+    }
+  ],
+  "signature": "45e32bc684f3d5c16d97057c0906f6448973eb507d57622f16350320b63dce0738dff758eec99f03f0cdd2b8c2a5b052192d21f7c0ad920762b9f8392ac0d10b"
+}

@@ -1,8 +1,11 @@
 #!/bin/sh
-# ArqTras-only authorship: strip every Co-authored-by / Cursor Signed-off-by trailer.
-sed -i \
+# ArqTras-only authorship: strip every Co-authored-by / Cursor trailer (macOS + Linux).
+MSG_FILE="$1"
+[ -f "$MSG_FILE" ] || exit 0
+TMP=$(mktemp)
+sed \
   -e '/^Co-authored-by:/Id' \
   -e '/^Signed-off-by: Cursor /Id' \
   -e '/^Signed-off-by: Cursor Agent /Id' \
   -e '/^Made-with: Cursor/Id' \
-  "$1"
+  "$MSG_FILE" > "$TMP" && mv "$TMP" "$MSG_FILE"

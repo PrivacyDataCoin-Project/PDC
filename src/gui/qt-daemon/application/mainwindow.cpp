@@ -2537,6 +2537,17 @@ QString MainWindow::setup_jwt_wallet_rpc(const QString& param)
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
 
+QString MainWindow::select_wallet_rpc(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_ARG_FROM_JSON(view::wallet_id_obj, owd);
+  PREPARE_RESPONSE(view::api_void, ar);
+  ar.error_code = m_backend.select_wallet_rpc(owd.wallet_id);
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+
 QString MainWindow::is_valid_restore_wallet_text(const QString& param)
 {
   TRY_ENTRY();

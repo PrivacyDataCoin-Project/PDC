@@ -170,6 +170,8 @@ namespace currency
 
     
     bool ado_sign_thirdparty = false;//@#@ TODO: add to serialization map @zoidberg
+    // Not serialized. Set only for an explicit native-coin burn, whose amount is the tx fee.
+    bool allow_high_fee = false;
 
 
     BEGIN_SERIALIZE_OBJECT()
