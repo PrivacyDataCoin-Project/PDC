@@ -4056,23 +4056,70 @@ const std::unordered_map<crypto::public_key, tools::wallet_own_asset_context>& w
   return m_own_asset_descriptors;
 }
 //----------------------------------------------------------------------------------------------------
+namespace
+{
+  // Canonical signing blob for assets_whitelist.json (R-02). Must stay in sync with
+  // utils/sign_assets_whitelist.py and website/api/ASSETS_WHITELIST_SIGNATURE.md.
+  // One asset per block of newline-terminated fields; signature field is never included.
+  std::string get_assets_whitelist_signing_blob(const std::vector<currency::asset_descriptor_with_id>& assets)
+  {
+    std::stringstream ss;
+    for (const auto& a : assets)
+    {
+      ss << epee::string_tools::pod_to_hex(a.asset_id) << '\n'
+         << a.total_max_supply << '\n'
+         << a.current_supply << '\n'
+         << static_cast<unsigned int>(a.decimal_point) << '\n'
+         << a.ticker << '\n'
+         << a.full_name << '\n'
+         << a.meta_info << '\n'
+         << epee::string_tools::pod_to_hex(a.owner) << '\n'
+         << (a.hidden_supply ? '1' : '0') << '\n';
+    }
+    return ss.str();
+  }
+}
+//----------------------------------------------------------------------------------------------------
 bool wallet2::load_whitelisted_tokens() const
 {
   if (!m_use_assets_whitelisting)
     return true;
 
-  m_whitelisted_assets.clear();
-  std::string body;
   wallet_public::assets_whitelist aw = AUTO_VAL_INIT(aw);
-  if (epee::net_utils::get_http_json_t(WALLET_ASSETS_WHITELIST_URL, aw))
+  if (!epee::net_utils::get_http_json_t(WALLET_ASSETS_WHITELIST_URL, aw))
   {
-    for (auto it = aw.assets.begin(); it != aw.assets.end(); it++)
-    {
-      m_whitelisted_assets[it->asset_id] = static_cast<currency::asset_descriptor_base>(*it);
-    }
-    return true;
+    WLT_LOG_YELLOW("Failed to fetch assets whitelist from " << WALLET_ASSETS_WHITELIST_URL
+      << "; keeping previous whitelist (" << m_whitelisted_assets.size() << " assets)", LOG_LEVEL_0);
+    return false;
   }
-  return false;
+
+  if (aw.signature == currency::null_sig)
+  {
+    WLT_LOG_YELLOW("Assets whitelist signature is zero/empty; refusing to update whitelist", LOG_LEVEL_0);
+    return false;
+  }
+
+  crypto::public_key validation_pub = AUTO_VAL_INIT(validation_pub);
+  if (!epee::string_tools::parse_tpod_from_hex_string(WALLET_ASSETS_WHITELIST_VALIDATION_PUBLIC_KEY, validation_pub))
+  {
+    WLT_LOG_ERROR("Invalid WALLET_ASSETS_WHITELIST_VALIDATION_PUBLIC_KEY; refusing to update whitelist");
+    return false;
+  }
+
+  const std::string blob = get_assets_whitelist_signing_blob(aw.assets);
+  const crypto::hash h = crypto::cn_fast_hash(blob.data(), blob.size());
+  if (!crypto::check_signature(h, validation_pub, aw.signature))
+  {
+    WLT_LOG_YELLOW("Assets whitelist signature verification failed; refusing to update whitelist", LOG_LEVEL_0);
+    return false;
+  }
+
+  m_whitelisted_assets.clear();
+  for (auto it = aw.assets.begin(); it != aw.assets.end(); it++)
+  {
+    m_whitelisted_assets[it->asset_id] = static_cast<currency::asset_descriptor_base>(*it);
+  }
+  return true;
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::load_whitelisted_tokens_if_not_loaded() const
