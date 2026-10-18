@@ -1,7 +1,7 @@
 # Resolve BUILD_COMMIT_ID for src/version.h.in (@VERSION@).
 # Prefer a short hash from `git describe --match vX.Y.Z`; if that fails (no
 # matching tag) or the regex yields nothing, fall back to rev-parse so the
-# version string never ends up as "2.4.2.9[]".
+# version string never ends up as "2.4.3.10[]".
 
 execute_process(
   COMMAND "${GIT}" describe --dirty --match "v${VERSION}"
