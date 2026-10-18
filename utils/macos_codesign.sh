@@ -35,18 +35,45 @@ readonly SEARCH_LIST_BACKUP="${RUNNER_TEMP:-/tmp}/pdc-keychain-search-list.txt"
 die() { echo "::error::$*" >&2; exit 1; }
 note() { echo "==> $*"; }
 
-# Retry a flaky Apple-network command (e.g. stapler staple) up to NOTARIZE_RETRIES
-# times with linear back-off, then give up. Usage: retry_apple "label" cmd args...
+# True when stapling may warn-and-continue (CI workflow_dispatch / push).
+# Release builds keep the hard failure so shippable assets stay stapled.
+staple_soft_fail_enabled() {
+  case "${STAPLE_SOFT_FAIL:-}" in
+    1|true|TRUE|yes|YES) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Retry a flaky Apple-network command (stapler staple/validate) up to
+# NOTARIZE_RETRIES times with growing back-off. Error 68 is Apple's ticket CDN
+# lag: the notary submission was Accepted but the ticket is not fetchable yet.
+# Usage: retry_apple "label" cmd args...
 retry_apple() {
   local what="$1"; shift
-  local tries="${NOTARIZE_RETRIES:-5}" i
+  # Default 10: Error 68 often clears after several minutes on Apple's side.
+  local tries="${NOTARIZE_RETRIES:-10}" i delay rc
+  local log="${RUNNER_TEMP:-/tmp}/pdc-stapler-retry.log"
   for i in $(seq 1 "$tries"); do
-    if "$@"; then return 0; fi
+    set +e
+    "$@" >"$log" 2>&1
+    rc=$?
+    set -e
+    cat "$log" 2>/dev/null || true
+    if [ "$rc" -eq 0 ]; then
+      return 0
+    fi
     if [ "$i" -lt "$tries" ]; then
-      note "$what failed; retry $i/$tries in $((i * 30))s"
-      sleep "$((i * 30))"
+      # 45s, 90s, 135s, ... capped at 180s between attempts
+      delay=$((i * 45))
+      if [ "$delay" -gt 180 ]; then delay=180; fi
+      note "$what failed; retry $i/$tries in ${delay}s"
+      sleep "$delay"
     fi
   done
+  if staple_soft_fail_enabled && grep -q 'Error 68' "$log" 2>/dev/null; then
+    echo "::warning title=Staple Error 68::$what failed after $tries attempts (Apple ticket CDN). Continuing with notarized but unstapled artifact; Gatekeeper will use an online check."
+    return 0
+  fi
   die "$what failed after $tries attempts"
 }
 
@@ -344,9 +371,10 @@ cmd_notarize() {
     *.dmg|*.pkg)
       note "stapling $target"
       # stapler downloads the ticket from Apple and can hit the same transient
-      # network failures as the submit, so retry it too. validate is local-only.
+      # network failures as the submit (Error 68). validate has also been seen
+      # to flake with Error 68 right after a successful staple, so retry both.
       retry_apple "staple $(basename "$target")" xcrun stapler staple "$target"
-      xcrun stapler validate "$target"
+      retry_apple "validate $(basename "$target")" xcrun stapler validate "$target"
       ;;
     *.zip)
       note "notarized; a .zip cannot be stapled (the ticket is served online instead)"
@@ -370,14 +398,14 @@ cmd_notarize_app() {
 
   note "stapling $app"
   retry_apple "staple $(basename "$app")" xcrun stapler staple "$app"
-  xcrun stapler validate "$app"
+  retry_apple "validate $(basename "$app")" xcrun stapler validate "$app"
 }
 
 cmd_staple() {
   local target="${1:?staple needs a path}"
   note "stapling $target"
   retry_apple "staple $(basename "$target")" xcrun stapler staple "$target"
-  xcrun stapler validate "$target"
+  retry_apple "validate $(basename "$target")" xcrun stapler validate "$target"
 }
 
 # ------------------------------------------------------------------- verify ---
@@ -391,9 +419,18 @@ cmd_verify_app() {
   codesign --display --verbose=2 "$app" 2>&1 | grep -q 'flags=.*runtime' \
     || die "$app is not signed with the hardened runtime"
   echo "--- notarization ticket ---"
-  xcrun stapler validate "$app" || die "$app has no stapled notarization ticket"
+  # Same Error 68 flake as staple: retry, and soft-fail outside release builds.
+  if ! retry_apple "validate $(basename "$app")" xcrun stapler validate "$app"; then
+    die "$app has no stapled notarization ticket"
+  fi
   echo "--- Gatekeeper ---"
-  spctl --assess --verbose=4 --type exec "$app"
+  if staple_soft_fail_enabled; then
+    if ! spctl --assess --verbose=4 --type exec "$app"; then
+      echo "::warning title=Gatekeeper::spctl assess failed for $app (soft-fail; notarization still Accepted)"
+    fi
+  else
+    spctl --assess --verbose=4 --type exec "$app"
+  fi
 }
 
 cmd_verify_dmg() {
@@ -401,9 +438,19 @@ cmd_verify_dmg() {
   echo "--- codesign ---"
   codesign --verify --strict --verbose=2 "$dmg"
   echo "--- notarization ticket ---"
-  xcrun stapler validate "$dmg" || die "$dmg has no stapled notarization ticket"
+  # Observed in CI: staple+validate succeeded, then a second validate ~10s later
+  # returned Error 68. Retry here; soft-fail on workflow_dispatch / push.
+  if ! retry_apple "validate $(basename "$dmg")" xcrun stapler validate "$dmg"; then
+    die "$dmg has no stapled notarization ticket"
+  fi
   echo "--- Gatekeeper ---"
-  spctl --assess --verbose=4 --type open --context context:primary-signature "$dmg"
+  if staple_soft_fail_enabled; then
+    if ! spctl --assess --verbose=4 --type open --context context:primary-signature "$dmg"; then
+      echo "::warning title=Gatekeeper::spctl assess failed for $dmg (soft-fail; notarization still Accepted)"
+    fi
+  else
+    spctl --assess --verbose=4 --type open --context context:primary-signature "$dmg"
+  fi
 }
 
 # ------------------------------------------------------------------ cleanup ---
