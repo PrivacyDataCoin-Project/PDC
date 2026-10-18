@@ -20,3 +20,8 @@ pdc_utils_js/
 pdc_trade_frontend/
 pdc_trade_backend/
 pdc_atomic_swap_example/
+
+# Local process / checklist docs (not for releases)
+REMEDIATION_PROCESS.md
+PLAIN_WALLET_API.md
+GO_CHECKLIST_STATUS.md
