@@ -31,7 +31,9 @@ namespace tools
   static constexpr pre_download_entry c_pre_download_lmdb = { "", "", 0, 0 };
 #endif
 
-  static constexpr uint64_t pre_download_min_size_difference = 512 * 1024 * 1024; // minimum difference in size between local DB and the downloadable one to start downloading
+  // PDC snapshots are small (~248 MiB LMDB / ~256 MiB MDBX); 512 MiB effectively
+  // disabled auto-predownload when a partial local DB already existed.
+  static constexpr uint64_t pre_download_min_size_difference = 150 * 1024 * 1024; // 150 MiB
 
   template<class callback_t>
   bool process_predownload(const boost::program_options::variables_map& vm, callback_t cb_should_stop)
