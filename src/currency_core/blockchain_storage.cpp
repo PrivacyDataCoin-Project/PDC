@@ -4172,6 +4172,12 @@ bool blockchain_storage::pop_asset_info(const asset_descriptor_operation& ado, c
 //------------------------------------------------------------------
 bool blockchain_storage::validate_ado_ownership(asset_op_verification_context& avc) const
 {
+  // Under checkpoints tx.proofs are pruned before put_asset_info runs; block
+  // validity is already bound by the checkpoint hash (same rationale as skipped
+  // ring/balance/surjection checks in handle_block_to_main_chain).
+  if (m_is_in_checkpoint_zone)
+    return true;
+
   bool r = false;
   CHECK_AND_ASSERT_MES(avc.asset_op_history->size() != 0, false, "asset with id " << avc.asset_id << " has empty history record");
   const asset_descriptor_operation& last_ado = avc.asset_op_history->back();
@@ -4276,7 +4282,8 @@ bool blockchain_storage::validate_asset_operation_hf4(asset_op_verification_cont
     }
   }
 
-  if (need_to_validate_ao_amount_commitment)
+  // Skip amount-commitment proofs under checkpoints (tx.proofs pruned earlier).
+  if (need_to_validate_ao_amount_commitment && !m_is_in_checkpoint_zone)
   {
     bool r = validate_asset_operation_amount_commitment(avc);
     CHECK_AND_ASSERT_MES(r, false, "Balance proof validation failed for asset_descriptor_operation");
@@ -4367,7 +4374,8 @@ bool blockchain_storage::validate_asset_operation_hf5(asset_op_verification_cont
     }
   }
 
-  if (need_to_validate_ao_amount_commitment)
+  // Skip amount-commitment proofs under checkpoints (tx.proofs pruned earlier).
+  if (need_to_validate_ao_amount_commitment && !m_is_in_checkpoint_zone)
   {
     bool r = validate_asset_operation_amount_commitment(avc);
     CHECK_AND_ASSERT_MES(r, false, "Balance proof validation failed for asset_descriptor_operation");
