@@ -536,25 +536,38 @@ namespace misc_utils
   {
     typedef std::set<key> main_set;
     main_set m_set;
-    std::multimap<expiration_type, typename main_set::iterator> m_expirations;
+    // Store keys (not set iterators): duplicate expiration entries must not
+    // leave dangling iterators after erase — that UAF aborts in libmalloc.
+    std::multimap<expiration_type, key> m_expirations;
 
     const main_set& get_set()
     {
       return m_set;
     }
-    void add(const key& k, const expiration_type& e)
+    // Returns false if key was already present (no second expiration recorded).
+    bool add(const key& k, const expiration_type& e)
     {
       auto res = m_set.insert(k);
-      m_expirations.insert({ e, res.first });
+      if (!res.second)
+        return false;
+      m_expirations.insert({ e, k });
+      return true;
     }
 
     void remove_if_expiration_less_than(const expiration_type& e)
     {
       while(m_expirations.size() && m_expirations.begin()->first < e)
       {
+        // Erase-by-key: safe if the key was already removed via a stale entry.
         m_set.erase(m_expirations.begin()->second);
         m_expirations.erase(m_expirations.begin());
       }
+    }
+
+    void clear()
+    {
+      m_set.clear();
+      m_expirations.clear();
     }
   };
 

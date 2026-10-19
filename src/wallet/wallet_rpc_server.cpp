@@ -23,7 +23,8 @@ DISABLE_VS_WARNINGS(4244)
 POP_VS_WARNINGS
 #include "crypto/bitcoin/sha256_helper.h"
 
-#define JWT_TOKEN_EXPIRATION_MAXIMUM          (60 * 60)
+// get_tick_count() returns milliseconds; keep salts for one hour.
+#define JWT_TOKEN_EXPIRATION_MAXIMUM          (60ull * 60ull * 1000ull)
 #define JWT_TOKEN_CLAIM_NAME_BODY_HASH        "body_hash"
 #define JWT_TOKEN_CLAIM_NAME_SALT             "salt"
 #define JWT_TOKEN_CLAIM_NAME_EXPIRATION       "exp"     
@@ -207,7 +208,7 @@ namespace tools
 
     if(command_line::has_arg(vm, arg_jwt_secret))
     {
-      m_jwt_secret = command_line::get_arg(vm, arg_jwt_secret);
+      set_jwt_secret(command_line::get_arg(vm, arg_jwt_secret));
     }
     return epee::http_server_impl_base<wallet_rpc_server, connection_context>::init(m_port, m_bind_ip);
   }
@@ -220,15 +221,13 @@ namespace tools
     if(it == query_info.m_header_info.m_etc_fields.end() || it->second.empty())
       return false;
 
-    // Snapshot secret under the same lock as salt ops so concurrent setup_wallet_rpc
-    // / multi-threaded daemon RPC (core_rpc_server::run(2)) cannot race std::set.
-    std::string jwt_secret;
-    {
-      std::lock_guard<std::mutex> lock(m_jwt_salts_lock);
-      jwt_secret = m_jwt_secret;
-    }
-    if(jwt_secret.empty())
+    // Serialize the whole JWT path: core_rpc_server::run(2) can authenticate two
+    // Companion requests in parallel; keeping verify+salt bookkeeping under one
+    // lock closes remaining races (incl. OpenSSL HMAC / set erase UAF).
+    std::lock_guard<std::mutex> lock(m_jwt_salts_lock);
+    if(m_jwt_secret.empty())
       return false;
+    const std::string jwt_secret = m_jwt_secret;
     
     try
     {
@@ -253,21 +252,21 @@ namespace tools
         throw std::runtime_error("Body hash missmatch");
       }
 
+      if(m_jwt_used_salts.get_set().size() > JWT_TOKEN_OVERWHELM_LIMIT)
       {
-        std::lock_guard<std::mutex> lock(m_jwt_salts_lock);
-        if(m_jwt_used_salts.get_set().size() > JWT_TOKEN_OVERWHELM_LIMIT)
-        {
-          throw std::runtime_error("Salt is overwhelmed");
-        }
-        if(m_jwt_used_salts.get_set().find(salt) != m_jwt_used_salts.get_set().end())
-        {
-          throw std::runtime_error("Salt reused");
-        }
-
-        uint64_t ticks_now = epee::misc_utils::get_tick_count();
-        m_jwt_used_salts.add(salt, ticks_now + JWT_TOKEN_EXPIRATION_MAXIMUM);
-        m_jwt_used_salts.remove_if_expiration_less_than(ticks_now);
+        throw std::runtime_error("Salt is overwhelmed");
       }
+      if(m_jwt_used_salts.get_set().find(salt) != m_jwt_used_salts.get_set().end())
+      {
+        throw std::runtime_error("Salt reused");
+      }
+
+      uint64_t ticks_now = epee::misc_utils::get_tick_count();
+      if(!m_jwt_used_salts.add(salt, ticks_now + JWT_TOKEN_EXPIRATION_MAXIMUM))
+      {
+        throw std::runtime_error("Salt reused");
+      }
+      m_jwt_used_salts.remove_if_expiration_less_than(ticks_now);
 
       LOG_PRINT_L3("JWT token OK");
       return true;
@@ -331,12 +330,13 @@ namespace tools
   {
     std::lock_guard<std::mutex> lock(m_jwt_salts_lock);
     m_jwt_secret = jwt;
+    // New Companion session / rotated secret must not inherit prior salts.
+    m_jwt_used_salts.clear();
   }
   //------------------------------------------------------------------------------------------------------------------------------
   const std::string& wallet_rpc_server::get_jwt_secret()
   {
-    // Callers that need a stable copy across threads should snapshot under their own
-    // synchronization; auth_http_request already copies under m_jwt_salts_lock.
+    // Not thread-safe; prefer set_jwt_secret / auth path which use m_jwt_salts_lock.
     return m_jwt_secret;
   }
   //------------------------------------------------------------------------------------------------------------------------------
