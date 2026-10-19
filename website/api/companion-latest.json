@@ -1,9 +1,9 @@
 {
-  "version": "0.1.14",
+  "version": "0.1.15",
   "name": "PDC Companion",
   "downloadUrl": "https://trade.privacydatacoin.com/api/companion/download",
   "firefoxDownloadUrl": "https://trade.privacydatacoin.com/api/companion/download?variant=firefox",
   "releaseNotesUrl": "https://github.com/PrivacyDataCoin-Project/pdc_web3/releases",
-  "htmlUrl": "https://github.com/PrivacyDataCoin-Project/pdc_web3/releases/tag/extension-v0.1.14",
-  "updatedAt": "2026-10-18"
+  "htmlUrl": "https://github.com/PrivacyDataCoin-Project/pdc_web3/releases/tag/extension-v0.1.15",
+  "updatedAt": "2026-10-19"
 }
