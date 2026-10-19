@@ -1,0 +1,11 @@
+{
+  "ts": 0,
+  "maj": 3,
+  "min": 0,
+  "rev": 0,
+  "build": 11,
+  "cs": [
+    { "build": 11, "mode": 2 },
+    { "build": 10, "mode": 3 }
+  ]
+}

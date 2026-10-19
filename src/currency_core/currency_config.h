@@ -287,6 +287,9 @@
 #define ZANO_HARDFORK_06_MIN_BUILD_VER                  4
 #define ZANO_HARDFORK_07_AFTER_HEIGHT                   1199
 #define ZANO_HARDFORK_07_MIN_BUILD_VER                  4
+// HF8: force upgraded nodes before PoS strict sequence limit (h>57000).
+#define ZANO_HARDFORK_08_AFTER_HEIGHT                   50000
+#define ZANO_HARDFORK_08_MIN_BUILD_VER                  11
 #else
 // Testnet
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   0
@@ -300,6 +303,9 @@
 #define ZANO_HARDFORK_06_MIN_BUILD_VER                  4
 #define ZANO_HARDFORK_07_AFTER_HEIGHT                   1199
 #define ZANO_HARDFORK_07_MIN_BUILD_VER                  4
+// HF8 before testnet PoS strict sequence limit (h>18000).
+#define ZANO_HARDFORK_08_AFTER_HEIGHT                   15000
+#define ZANO_HARDFORK_08_MIN_BUILD_VER                  11
 #endif
 
 
@@ -311,8 +317,9 @@
 #define ZANO_HARDFORK_05                                5
 #define ZANO_HARDFORK_06                                6
 #define ZANO_HARDFORK_07                                7
-#define ZANO_HARDFORKS_TOTAL                            8
-#define ZANO_ACTIVE_HARDFORKS_TOTAL                     8
+#define ZANO_HARDFORK_08                                8
+#define ZANO_HARDFORKS_TOTAL                            9
+#define ZANO_ACTIVE_HARDFORKS_TOTAL                     9
 
 
 
