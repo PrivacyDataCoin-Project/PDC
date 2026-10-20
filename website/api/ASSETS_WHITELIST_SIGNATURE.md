@@ -1,7 +1,7 @@
 # assets_whitelist.json — signature (R-02a)
 
-**Updated (2026-10-18):** `owner` = on-chain mint authority
-`50bb21f31675bfa40947586a0d01f13b8510c7143e6f8770e951c53bc8587abb`;
+**Updated (2026-10-20):** whitelist = **BTCX** + **ARQX** (same mint `owner`
+`50bb21f31675bfa40947586a0d01f13b8510c7143e6f8770e951c53bc8587abb`);
 `current_supply` from live `get_asset_info` (refresh when peg changes);
 `signature` is a real Cryptonote signature under
 `WALLET_ASSETS_WHITELIST_VALIDATION_PUBLIC_KEY`
