@@ -2,6 +2,16 @@ name: PDC macOS
 
 on:
   workflow_dispatch:
+    inputs:
+      build:
+        description: 'Build scope (full = CLI both arches + GUI; cli* skips GUI)'
+        type: choice
+        default: full
+        options:
+          - full
+          - cli
+          - cli-arm64
+          - cli-x64
   # Callable from build-all.yml; always builds mainnet.
   workflow_call:
     inputs:
@@ -9,6 +19,10 @@ on:
         description: 'Commit SHA or ref to build (defaults to the triggering commit)'
         type: string
         default: ''
+      build:
+        description: 'Build scope (full | cli | cli-arm64 | cli-x64)'
+        type: string
+        default: full
 
 permissions:
   contents: read
@@ -34,17 +48,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - arch: x64
-            runner: macos-15-intel
-            cmake_arch: x86_64
-            osx_min: '10.15'
-            openssl_target: darwin64-x86_64-cc
-          - arch: arm64
-            runner: macos-15
-            cmake_arch: arm64
-            osx_min: '11.0'
-            openssl_target: darwin64-arm64-cc
+        # full/cli → both arches; cli-arm64 / cli-x64 → single arch only
+        include: ${{ fromJSON((inputs.build || 'full') == 'cli-arm64' && '[{"arch":"arm64","runner":"macos-15","cmake_arch":"arm64","osx_min":"11.0","openssl_target":"darwin64-arm64-cc"}]' || (inputs.build || 'full') == 'cli-x64' && '[{"arch":"x64","runner":"macos-15-intel","cmake_arch":"x86_64","osx_min":"10.15","openssl_target":"darwin64-x86_64-cc"}]' || '[{"arch":"x64","runner":"macos-15-intel","cmake_arch":"x86_64","osx_min":"10.15","openssl_target":"darwin64-x86_64-cc"},{"arch":"arm64","runner":"macos-15","cmake_arch":"arm64","osx_min":"11.0","openssl_target":"darwin64-arm64-cc"}]') }}
     env:
       DEPS_DIR: ${{ github.workspace }}/_deps
     steps:
@@ -240,6 +245,7 @@ jobs:
   make-universal:
     name: macOS Universal CLI (lipo)
     needs: build-cli
+    if: (inputs.build || 'full') != 'cli-arm64' && (inputs.build || 'full') != 'cli-x64'
     runs-on: macos-15
     # notarytool --wait blocks on Apple's queue; 15 minutes is not enough.
     timeout-minutes: 90
@@ -371,6 +377,7 @@ jobs:
   # Release-style GUI build (Pdc.app packed into a dmg)
   build-gui-x64:
     name: macOS GUI x64 (Qt 6.8) (mainnet)
+    if: (inputs.build || 'full') == 'full'
     runs-on: macos-15-intel
     timeout-minutes: 240
     env:
@@ -658,6 +665,7 @@ jobs:
   # Native Apple Silicon GUI (Qt 6.8, macOS 12+)
   build-gui-arm64:
     name: macOS GUI arm64 (Qt 6.8) (mainnet)
+    if: (inputs.build || 'full') == 'full'
     runs-on: macos-15
     timeout-minutes: 240
     env:

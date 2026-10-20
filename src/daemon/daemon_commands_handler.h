@@ -8,6 +8,11 @@
 
 #include <boost/lexical_cast.hpp>
 #include <boost/bind/placeholders.hpp>
+#include <boost/format.hpp>
+
+#include <ctime>
+#include <iomanip>
+#include <sstream>
 
 #include "console_handler.h"
 #include "p2p/net_node.h"
@@ -18,6 +23,9 @@
 #include "currency_core/bc_offers_service.h"
 #include "serialization/binary_utils.h"
 #include "simplewallet/password_container.h"
+#include "common/error_codes.h"
+#include "currency_core/connection_context.h"
+#include "version.h"
 
 namespace ph = boost::placeholders;
 
@@ -57,6 +65,9 @@ public:
     m_cmd_binder.set_handler("hide_hr", boost::bind(&daemon_commands_handler::hide_hr, this, ph::_1), "Stop showing hash rate");
     m_cmd_binder.set_handler("save", boost::bind(&daemon_commands_handler::save, this, ph::_1), "Save blockchain");
     m_cmd_binder.set_handler("print_daemon_stat", boost::bind(&daemon_commands_handler::print_daemon_stat, this, ph::_1), "Print daemon stat");
+    m_cmd_binder.set_handler("status", boost::bind(&daemon_commands_handler::status, this, ph::_1), "Show the current daemon status");
+    m_cmd_binder.set_handler("version", boost::bind(&daemon_commands_handler::version, this, ph::_1), "Print version information");
+    m_cmd_binder.set_handler("print_net_stats", boost::bind(&daemon_commands_handler::print_net_stats, this, ph::_1), "Print network traffic statistics");
     m_cmd_binder.set_handler("print_debug_stat", boost::bind(&daemon_commands_handler::print_debug_stat, this, ph::_1), "Print debug stat info");
     m_cmd_binder.set_handler("get_transactions_statics", boost::bind(&daemon_commands_handler::get_transactions_statistics, this, ph::_1), "Calculates transactions statistics");
     m_cmd_binder.set_handler("force_relay_tx_pool", boost::bind(&daemon_commands_handler::force_relay_tx_pool, this, ph::_1), "re-relay all transactions from pool");
@@ -127,6 +138,112 @@ private:
     currency::core_rpc_server::connection_context cc = AUTO_VAL_INIT(cc);
     m_rpc.on_get_info(req, resp, cc);
     LOG_PRINT_L0("STAT INFO:" << ENDL << epee::serialization::store_t_to_json(resp).c_str());
+    return true;
+  }
+  //--------------------------------------------------------------------------------
+  // Arqma-style console helpers (in-process only — no network RPC).
+  static std::string human_readable_bytes(uint64_t bytes)
+  {
+    static const char* units[] = {"B", "kB", "MB", "GB", "TB"};
+    double v = static_cast<double>(bytes);
+    size_t u = 0;
+    while (v >= 1024.0 && u + 1 < sizeof(units) / sizeof(units[0]))
+    {
+      v /= 1024.0;
+      ++u;
+    }
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(u == 0 ? 0 : 2) << v << " " << units[u];
+    return oss.str();
+  }
+  //--------------------------------------------------------------------------------
+  static const char* network_state_str(uint64_t state)
+  {
+    using info = currency::COMMAND_RPC_GET_INFO;
+    switch (state)
+    {
+    case info::daemon_network_state_connecting: return "connecting";
+    case info::daemon_network_state_synchronizing: return "synchronizing";
+    case info::daemon_network_state_online: return "online";
+    case info::daemon_network_state_loading_core: return "loading";
+    case info::daemon_network_state_internal_error: return "error";
+    case info::daemon_network_state_unloading_core: return "unloading";
+    case info::daemon_network_state_downloading_database: return "downloading db";
+    default: return "unknown";
+    }
+  }
+  //--------------------------------------------------------------------------------
+  bool version(const std::vector<std::string>& /*args*/)
+  {
+    std::cout << CURRENCY_NAME << " v" << PROJECT_VERSION_LONG << std::endl;
+    return true;
+  }
+  //--------------------------------------------------------------------------------
+  bool status(const std::vector<std::string>& /*args*/)
+  {
+    currency::COMMAND_RPC_GET_INFO::request req = AUTO_VAL_INIT(req);
+    req.flags = 0;
+    currency::COMMAND_RPC_GET_INFO::response resp = AUTO_VAL_INIT(resp);
+    currency::core_rpc_server::connection_context cc = AUTO_VAL_INIT(cc);
+    if (!m_rpc.on_get_info(req, resp, cc) || resp.status != API_RETURN_CODE_OK)
+    {
+      std::cout << "Problem fetching info" << std::endl;
+      return true;
+    }
+
+    const uint64_t height = resp.height;
+    const uint64_t net_height = resp.max_net_seen_height > height ? resp.max_net_seen_height : height;
+    const double pct = net_height ? (100.0 * static_cast<double>(height) / static_cast<double>(net_height)) : 100.0;
+
+    std::cout << boost::format("Height: %llu/%llu (%.1f%%), %s, v%s, PoW diff %llu, pool %llu, %llu(out)+%llu(in) connections")
+      % (unsigned long long)height
+      % (unsigned long long)net_height
+      % pct
+      % network_state_str(resp.daemon_network_state)
+      % (resp.version.empty() ? PROJECT_VERSION_LONG : resp.version)
+      % (unsigned long long)resp.pow_difficulty
+      % (unsigned long long)resp.tx_pool_size
+      % (unsigned long long)resp.outgoing_connections_count
+      % (unsigned long long)resp.incoming_connections_count
+      << std::endl;
+    return true;
+  }
+  //--------------------------------------------------------------------------------
+  bool print_net_stats(const std::vector<std::string>& /*args*/)
+  {
+    // get_connections() is private on node_server; call via the public i_p2p_endpoint API.
+    std::list<currency::currency_connection_context> conns;
+    nodetool::i_p2p_endpoint<currency::currency_connection_context>& endpoint = m_srv;
+    endpoint.get_connections(conns);
+
+    uint64_t bytes_in = 0;
+    uint64_t bytes_out = 0;
+    time_t oldest = 0;
+    for (const auto& c : conns)
+    {
+      bytes_in += c.m_recv_cnt;
+      bytes_out += c.m_send_cnt;
+      if (c.m_started && (!oldest || c.m_started < oldest))
+        oldest = c.m_started;
+    }
+
+    const time_t now = std::time(nullptr);
+    const uint64_t seconds = (oldest && now > oldest) ? static_cast<uint64_t>(now - oldest) : 0;
+    const uint64_t avg_in = seconds ? bytes_in / seconds : 0;
+    const uint64_t avg_out = seconds ? bytes_out / seconds : 0;
+
+    std::cout << boost::format("Received %llu bytes (%s) across %llu connections, average %s/s")
+      % (unsigned long long)bytes_in
+      % human_readable_bytes(bytes_in)
+      % (unsigned long long)conns.size()
+      % human_readable_bytes(avg_in)
+      << std::endl;
+    std::cout << boost::format("Sent %llu bytes (%s) across %llu connections, average %s/s")
+      % (unsigned long long)bytes_out
+      % human_readable_bytes(bytes_out)
+      % (unsigned long long)conns.size()
+      % human_readable_bytes(avg_out)
+      << std::endl;
     return true;
   }
   //--------------------------------------------------------------------------------
