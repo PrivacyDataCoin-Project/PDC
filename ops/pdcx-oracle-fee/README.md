@@ -4,25 +4,25 @@
 
 `PDCx` is the **payment asset** for sidechain CA→EVM attestation fees on the **PDC** network (not native wei / ETH).
 
-## Deploy (mainnet)
+## Mainnet (deployed)
 
-1. Review `asset-descriptor.pdcx.json` (initial supply = 10 000 PDCx @ 8 decimals).
-2. From a maintainer wallet (simplewallet):
+| Field | Value |
+|---|---|
+| ticker | `PDCx` |
+| asset_id | `5292b7984565b21d47e456c381973b700738b9819f9e96b841f68cfa116774bd` |
+| tx_id | `977bde4b38d065702e8483523ea5c9300b147bdb00c58d4f4f510f968e4601ac` |
+| decimals | 8 |
+| initial supply | 10 000 PDCx |
+
+Oracle host env (reversible):
 
 ```bash
-deploy_new_asset /path/to/asset-descriptor.pdcx.json
+ATTESTATION_FEE_ASSET_ID=5292b7984565b21d47e456c381973b700738b9819f9e96b841f68cfa116774bd
+ATTESTATION_FEE_AMOUNT=1000000   # 0.01 PDCx; set 0 to stop charging
+ATTESTATION_FEE_WEI=0            # ignored / retired
 ```
 
-3. Record `Asset ID` + tx id in `DEPLOYED.md` (gitignored secrets stay out of git).
-4. Point oracle env:
-
-```bash
-ATTESTATION_FEE_ASSET_ID=<64hex>
-ATTESTATION_FEE_AMOUNT=<atomic units>
-# ATTESTATION_FEE_WEI is ignored / must stay 0
-```
-
-5. EVM: deploy `PdcSidechainAttestationTokenFee.sol` with ERC-20 that represents PDCx (or a bridge wrap). Keep `paused=true` until soak completes; unpause to enable fees. **Rollback:** `pause()` or `setAttestationFee(0)` + oracle `SIDECHAIN_ATTESTATION_ENABLED=0`.
+EVM: deploy `PdcSidechainAttestationTokenFee.sol` **paused** with ERC-20 wrap of PDCx when ready. **Rollback:** `pause()` or fee=0 + `SIDECHAIN_ATTESTATION_ENABLED=0`.
 
 ## Rollback (pdcd binary)
 
