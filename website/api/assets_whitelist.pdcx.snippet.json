@@ -1,0 +1,12 @@
+{
+  "_comment": "Append to website/api/assets_whitelist.json assets[] after PDCX CA deploy, then re-sign. Replace asset_id and current_supply from get_asset_info.",
+  "asset_id": "REPLACE_WITH_MAINNET_ASSET_ID_64HEX",
+  "total_max_supply": 100000000000000000,
+  "current_supply": 0,
+  "decimal_point": 8,
+  "ticker": "PDCX",
+  "full_name": "Wrapped PDCX",
+  "meta_info": "Wrapped PDC on PDC; priced 1:1 with native PDC",
+  "owner": "50bb21f31675bfa40947586a0d01f13b8510c7143e6f8770e951c53bc8587abb",
+  "hidden_supply": false
+}
