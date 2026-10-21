@@ -1,0 +1,9 @@
+{
+  "ticker": "PDCx",
+  "full_name": "PDC Oracle Attestation Fee",
+  "meta_info": "Fee token for sidechain CA→EVM attestations; not a peg. Owner may pause fee acceptance off-chain by disabling SIDECHAIN fee flags / pausing EVM fee contract.",
+  "decimal_point": 8,
+  "current_supply": 1000000000000,
+  "total_max_supply": 100000000000000000,
+  "hidden_supply": false
+}

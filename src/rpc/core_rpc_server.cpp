@@ -121,6 +121,17 @@ namespace currency
     res.default_fee = m_core.get_blockchain_storage().get_core_runtime_config().tx_default_fee;
     res.minimum_fee = m_core.get_blockchain_storage().get_core_runtime_config().tx_pool_min_fee;
 
+    // Tip hash/timestamp are cheap and required by off-chain oracles / explorers.
+    // Always populate them so callers do not need TOTAL_COINS / POS_DIFFICULTY flags.
+    {
+      currency::block tip = AUTO_VAL_INIT(tip);
+      if (m_core.get_blockchain_storage().get_top_block(tip))
+      {
+        res.last_block_timestamp = tip.timestamp;
+        res.last_block_hash = string_tools::pod_to_hex(get_block_hash(tip));
+      }
+    }
+
     auto & hf = m_core.get_blockchain_storage().get_core_runtime_config().hard_forks.m_height_the_hardfork_n_active_after;
     for (size_t i = 0; i != hf.size(); i++)
     {
