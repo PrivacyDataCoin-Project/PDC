@@ -1,7 +1,8 @@
 {
+  "_comment": "On-chain ticker/full_name were set at deploy and cannot be changed (validate_ado_update_allowed). Display apps use ticker PDCX + fullName Wrapped PDC. meta_info was updated on-chain 2026-10-22.",
   "ticker": "PDCx",
   "full_name": "PDC Oracle Attestation Fee",
-  "meta_info": "Fee token for sidechain CA→EVM attestations; not a peg. Owner may pause fee acceptance off-chain by disabling SIDECHAIN fee flags / pausing EVM fee contract.",
+  "meta_info": "Wrapped PDC — 1:1 wrap of native PDC (CA). Used for Trade wrap bridge and oracle attestation fees.",
   "decimal_point": 8,
   "current_supply": 1000000000000,
   "total_max_supply": 100000000000000000,
