@@ -1,0 +1,12 @@
+{
+  "_comment": "OPTIONAL wallet display for oracle fee CA (ticker PDCx). Not the wrapped-PDC product (assets_whitelist.pdcx.snippet.json). Append only if wallets should list the fee token; then re-sign assets_whitelist.json. Do not conflate with 1:1 PDC wrap.",
+  "asset_id": "5292b7984565b21d47e456c381973b700738b9819f9e96b841f68cfa116774bd",
+  "total_max_supply": 100000000000000000,
+  "current_supply": 1000000000000,
+  "decimal_point": 8,
+  "ticker": "PDCx",
+  "full_name": "PDC Oracle Attestation Fee",
+  "meta_info": "Fee token for sidechain CA to EVM attestations; not a peg.",
+  "owner": "50bb21f31675bfa40947586a0d01f13b8510c7143e6f8770e951c53bc8587abb",
+  "hidden_supply": false
+}

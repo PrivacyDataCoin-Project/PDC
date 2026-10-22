@@ -10,7 +10,29 @@
       "meta_info": "Confidential Layer-style wrapped BTC on PDC; 1:1 peg via bridge",
       "owner": "50bb21f31675bfa40947586a0d01f13b8510c7143e6f8770e951c53bc8587abb",
       "hidden_supply": false
+    },
+    {
+      "asset_id": "d59ca1b363d5f44e0f087d9549b734815fbc2a6ab49ef0a877ccd910b1a1b9c3",
+      "total_max_supply": 55000000000000000,
+      "current_supply": 0,
+      "decimal_point": 9,
+      "ticker": "ARQX",
+      "full_name": "Wrapped Arqma",
+      "meta_info": "Wrapped ARQ on PDC; 1:1 peg via Trade bridge",
+      "owner": "50bb21f31675bfa40947586a0d01f13b8510c7143e6f8770e951c53bc8587abb",
+      "hidden_supply": false
+    },
+    {
+      "asset_id": "5292b7984565b21d47e456c381973b700738b9819f9e96b841f68cfa116774bd",
+      "total_max_supply": 100000000000000000,
+      "current_supply": 1000000000000,
+      "decimal_point": 8,
+      "ticker": "PDCX",
+      "full_name": "Wrapped PDCX",
+      "meta_info": "Wrapped PDC on PDC; priced 1:1 with native PDC",
+      "owner": "50bb21f31675bfa40947586a0d01f13b8510c7143e6f8770e951c53bc8587abb",
+      "hidden_supply": false
     }
   ],
-  "signature": "45e32bc684f3d5c16d97057c0906f6448973eb507d57622f16350320b63dce0738dff758eec99f03f0cdd2b8c2a5b052192d21f7c0ad920762b9f8392ac0d10b"
+  "signature": "6da254a868287523378d6317d3f681fd772b814781381ed54aae5a2e55cd500c30bd4a29304eae2fb02be11455f11490cb7cbef306f16d3ef583304476ee6706"
 }
