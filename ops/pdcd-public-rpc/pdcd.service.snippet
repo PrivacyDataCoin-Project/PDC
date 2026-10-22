@@ -1,0 +1,13 @@
+# /etc/systemd/system/pdcd.service — bind RPC to localhost ONLY so:
+#   - pool (pdcpool daemon 127.0.0.1:19211)
+#   - pool wallet (simplewallet --daemon-address=127.0.0.1:19211 → wallet-rpc :19212)
+#   - Trade / Explorer
+# keep full RPC without config changes.
+#
+# Public iOS wallets keep using 169.58.142.131:19211 via nginx allowlist.
+#
+# ExecStart example:
+# ExecStart=/home/ubuntu/pdc/pdcd --data-dir=/home/ubuntu/.PDC \
+#   --p2p-bind-ip=0.0.0.0 --p2p-bind-port=19121 \
+#   --rpc-bind-ip=127.0.0.1 --rpc-bind-port=19211 \
+#   --rpc-ignore-offline --disable-upnp --log-level=2 --no-console

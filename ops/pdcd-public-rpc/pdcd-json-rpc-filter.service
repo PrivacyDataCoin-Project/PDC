@@ -1,0 +1,21 @@
+[Unit]
+Description=PDC public JSON-RPC allowlist filter (wallet sync)
+After=network-online.target pdcd.service
+Wants=network-online.target
+Requires=pdcd.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/ops/pdcd-public-rpc
+Environment=PDCD_RPC_UPSTREAM=http://127.0.0.1:19211
+Environment=PDCD_RPC_FILTER_HOST=127.0.0.1
+Environment=PDCD_RPC_FILTER_PORT=19215
+ExecStart=/usr/bin/python3 /home/ubuntu/ops/pdcd-public-rpc/json_rpc_filter.py
+Restart=on-failure
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
