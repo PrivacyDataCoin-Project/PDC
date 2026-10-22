@@ -1,6 +1,6 @@
-# DRAFT — PDC 3.0.0.12 (do not publish yet)
+# DRAFT — PDC 3.0.0.12 (superseded — do not publish)
 
-**Status:** prepared for local soak. **Do not** create git tag `v3.0.0.12` or GitHub Release until local tests pass and an operator explicitly publishes.
+**Status:** **Superseded by [3.1.0](RELEASE_NOTES_3.1.0.md)** (same build **12**). Do **not** create tag `v3.0.0.12`.
 
 **Planned tag:** `v3.0.0.12`  
 **Base branch for cut:** `dev` → `master` (after soak)  
