@@ -49,7 +49,7 @@ public:
     m_cmd_binder.set_handler("print_bc_tx", boost::bind(&daemon_commands_handler::print_bc_tx, this, ph::_1), "Print blockchain info with trnsactions in a given blocks range, print_bc <begin_height> [<end_height>]");
     //m_cmd_binder.set_handler("print_bci", boost::bind(&daemon_commands_handler::print_bci, this, ph::_1));
     m_cmd_binder.set_handler("print_bc_outs", boost::bind(&daemon_commands_handler::print_bc_outs, this, ph::_1));
-    m_cmd_binder.set_handler("print_market", boost::bind(&daemon_commands_handler::print_market, this, ph::_1));
+    m_cmd_binder.set_handler("print_market", boost::bind(&daemon_commands_handler::print_market, this, ph::_1), "Print on-chain marketplace offers to market.txt (requires --enable-offers-service)");
     m_cmd_binder.set_handler("print_bc_outs_stats", boost::bind(&daemon_commands_handler::print_bc_outs_stats, this, ph::_1));
     m_cmd_binder.set_handler("print_block", boost::bind(&daemon_commands_handler::print_block, this, ph::_1), "Print block, print_block <block_hash> | <block_height>");
     m_cmd_binder.set_handler("print_block_info", boost::bind(&daemon_commands_handler::print_block_info, this, ph::_1), "Print block info, print_block <block_hash> | <block_height>");
@@ -335,7 +335,11 @@ private:
   bool print_market(const std::vector<std::string>& args)
   {
     bc_services::bc_offers_service* offers_service = dynamic_cast<bc_services::bc_offers_service*>(m_srv.get_payload_object().get_core().get_blockchain_storage().get_attachment_services_manager().get_service_by_id(BC_OFFERS_SERVICE_ID));
-    CHECK_AND_ASSERT_MES(offers_service != nullptr, false, "Offers service was not registered in attachment service manager!");
+    if (offers_service == nullptr)
+    {
+      std::cout << "Marketplace offers are disabled. Restart pdcd with --enable-offers-service to use print_market." << ENDL;
+      return true;
+    }
 
     offers_service->print_market(log_space::log_singletone::get_default_log_folder() + "/market.txt");
     return true;
