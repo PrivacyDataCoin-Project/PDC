@@ -6,6 +6,12 @@
 **Base branch for cut:** `dev` → `master` (after soak)  
 **Previous release:** `v3.0.0` / build 11 (`aa3985a`)
 
+## Compatibility with `v3.0.0` (build 11)
+
+- **Wire / P2P:** HF8 min build stays **11** (`ZANO_HARDFORK_08_MIN_BUILD_VER`). Build **12** peers remain compatible with release **11** nodes (no handshake raise).
+- **RPC:** `getinfo` tip hash/timestamp is **additive** — clients that ignored empty `last_block_hash` keep working; flag-gated reward fields unchanged.
+- **No consensus / hard-fork height change** in this draft.
+
 ## Highlights
 
 - **`getinfo` always returns tip `last_block_hash` / `last_block_timestamp`** without requiring `TOTAL_COINS` / `POS_DIFFICULTY` flags (cheap tip read). Required by oracle sidechain CA attestation.

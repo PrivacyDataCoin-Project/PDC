@@ -1,20 +1,15 @@
 # assets_whitelist.json — signature (R-02a)
 
-**Updated (2026-10-20):** whitelist = **BTCX** + **ARQX** (same mint `owner`
-`50bb21f31675bfa40947586a0d01f13b8510c7143e6f8770e951c53bc8587abb`);
+**Updated (2026-10-22):** whitelist = **BTCX** + **ARQX** + **PDCX** (same mint
+`owner` `50bb21f31675bfa40947586a0d01f13b8510c7143e6f8770e951c53bc8587abb`);
 `current_supply` from live `get_asset_info` (refresh when peg changes);
 `signature` is a real Cryptonote signature under
 `WALLET_ASSETS_WHITELIST_VALIDATION_PUBLIC_KEY`
 (`1bfd31dc840c0f205d9b72df18d298cbdef716e4389684c7da19f3db2a77c65f`).
 
-**When wrapped PDCX (1:1 PDC product) is deployed:** append from
-`assets_whitelist.pdcx.snippet.json` (fill `asset_id` + live `current_supply`),
-re-sign, deploy to `/var/www/pdc-api/assets_whitelist.json`, and set `PDCX_ASSET_ID`
-in explorer / wallet. Ticker **PDCX** uses native **PDC** price/icon.
-
-**Oracle fee CA (`PDCx`, already on mainnet):** optional display entry is
-`assets_whitelist.pdcx-fee.snippet.json`. Do **not** mix it with the wrapped-PDCX
-product. Fee usage is controlled by oracle env / EVM pause, not by whitelist.
+**PDCX** (`5292b798…774bd`, on-chain ticker `PDCx`): whitelist display
+**Wrapped PDCX**; explorer/wallet use native **PDC** USD price, website, and icon.
+Same CA is also used for oracle attestation fees (fee usage gated off-chain).
 
 ## Algorithm (must match `wallet2::load_whitelisted_tokens`)
 

@@ -34,3 +34,13 @@ sudo systemctl start pdcd
 ```
 
 Asset `PDCx` itself remains on-chain if already deployed; fee *usage* is disabled via oracle/EVM pause — that is the reversible control surface.
+
+## Mainnet prepare without GitHub release
+
+See [MAINNET_NO_RELEASE.md](./MAINNET_NO_RELEASE.md) and [shadow-pdcd-mainnet.md](./shadow-pdcd-mainnet.md).
+Prefer shadow install:
+
+```bash
+./ops/pdcx-oracle-fee/install-shadow-binary.sh /path/to/built/pdcd
+./ops/pdcx-oracle-fee/run-shadow-pdcd.sh preflight
+```

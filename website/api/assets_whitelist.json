@@ -21,7 +21,18 @@
       "meta_info": "Wrapped ARQ on PDC; 1:1 peg via Trade bridge",
       "owner": "50bb21f31675bfa40947586a0d01f13b8510c7143e6f8770e951c53bc8587abb",
       "hidden_supply": false
+    },
+    {
+      "asset_id": "5292b7984565b21d47e456c381973b700738b9819f9e96b841f68cfa116774bd",
+      "total_max_supply": 100000000000000000,
+      "current_supply": 1000000000000,
+      "decimal_point": 8,
+      "ticker": "PDCX",
+      "full_name": "Wrapped PDCX",
+      "meta_info": "Wrapped PDC on PDC; priced 1:1 with native PDC",
+      "owner": "50bb21f31675bfa40947586a0d01f13b8510c7143e6f8770e951c53bc8587abb",
+      "hidden_supply": false
     }
   ],
-  "signature": "69d9369c02b5531b29755fd3c733b97686ea1dafd3390c55eb267a7f4ce5690ee4e09bcb828aecc0ffc2b03d74e34318e1d02b9602c068750eefdb7f2e81750b"
+  "signature": "6da254a868287523378d6317d3f681fd772b814781381ed54aae5a2e55cd500c30bd4a29304eae2fb02be11455f11490cb7cbef306f16d3ef583304476ee6706"
 }
