@@ -46,6 +46,8 @@ namespace bare_decoy_batch_planner
     if (decoy_count >= max_bare_pool_size)
       throw std::runtime_error("Requested bare ring exceeds the daemon output limit");
 
+    // Missing/zero count => full uint64 range. Daemon maps candidates with
+    // outputs_count (modulo + walk). Prefer an empty map over foreign-chain counts.
     uint64_t upper_index = std::numeric_limits<uint64_t>::max();
     const auto count_it = bare_output_count_by_amount.find(batch.input_amount);
     if (count_it != bare_output_count_by_amount.end() && count_it->second != 0)

@@ -9,6 +9,7 @@
 
 #include "gtest/gtest.h"
 #include "wallet/bare_decoy_batch_planner.h"
+#include "wallet/bare_outputs_snapshot.h"
 
 using tools::bare_decoy_batch_planner::append_bare_decoy_candidates;
 using tools::bare_decoy_batch_planner::input_plan_request;
@@ -26,6 +27,26 @@ namespace
       {2000000000000ULL, 500ULL}
     };
   }
+}
+
+// H1 guard: embedded snapshot must not carry another chain's (e.g. Zano) counts.
+// Empty map is the safe PDC default until `export_bare_outputs` is run on PDC.
+TEST(bare_decoy_batch_planner, pdc_bare_outputs_snapshot_is_empty_until_exported)
+{
+  EXPECT_TRUE(currency::bare_outputs_snapshot::bare_output_count_by_amount.empty());
+}
+
+// Empty snapshot must still produce a valid bare request (daemon resolves bounds).
+TEST(bare_decoy_batch_planner, empty_count_map_still_appends_real_and_decoys)
+{
+  request_batch batch;
+  batch.input_amount = 1000000000000ULL;
+  const uint64_t real_gindex = 99;
+  std::mt19937_64 rng(3);
+  const std::unordered_map<uint64_t, uint64_t> empty_counts;
+  append_bare_decoy_candidates(batch, 8, real_gindex, empty_counts, k_max_bare_pool_size, rng);
+  ASSERT_EQ(batch.global_offsets.size(), 9u);
+  EXPECT_EQ(batch.global_offsets.front(), real_gindex);
 }
 
 // #765/#771: real_gindex is always included; decoy_count additional candidates are requested.

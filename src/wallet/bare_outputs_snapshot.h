@@ -11,7 +11,9 @@ namespace currency
 {
 namespace bare_outputs_snapshot
 {
-  // Full amount-bucket sizes: valid global indices are [0, count).
+  // Full amount-bucket sizes for THIS chain only: valid global indices are [0, count).
+  // Empty map is intentional until regenerated via daemon `export_bare_outputs`
+  // against a synced PDC node (never copy Zano or other-chain snapshots).
   extern const std::unordered_map<std::uint64_t, std::uint64_t> bare_output_count_by_amount;
 }
 }

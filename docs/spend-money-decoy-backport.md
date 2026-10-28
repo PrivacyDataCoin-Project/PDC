@@ -30,11 +30,24 @@ and Zarcanum PoS coinbase decoys.
 - Daemon: `blockchain_storage::get_random_outs_for_amounts4`, `get_bare_outs_by_indices`, block strategy helpers
 - Wallet proxies: `call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4` (keeps PDC `core_rpc_proxy.h` naming)
 - Wallet: `prepare_tx_sources` uses AMOUNTS4; bare planning helpers; PoS ZC path via AMOUNTS4
-- Snapshot: `bare_outputs_snapshot.{h,cpp}` (Zano amount-bucket sizes for bare sampling bounds)
+- Snapshot: `bare_outputs_snapshot.{h,cpp}` — **empty by default** (safe). Do not reuse Zano counts.
+- Daemon command: `export_bare_outputs <file.cpp>` regenerates PDC-chain counts after sync past HF4
 - Shared planner: `src/wallet/bare_decoy_batch_planner.h` (unit-tested; wallet2 bare append uses it)
 - Adapter: PR #757 callback / long-refresh on `i_wallet_to_i_backend_adapter`
 
 PDC-only APIs (`burn_native`, assets whitelist signing blob, etc.) are unchanged.
+
+### Bare outputs snapshot (critical)
+
+Wrong-chain bucket sizes bias bare decoy sampling (privacy regression). PDC ships an empty
+map so the wallet samples the full index domain and the daemon applies the real
+`outputs_count`. After mainnet sync past HF4:
+
+```text
+export_bare_outputs src/wallet/bare_outputs_snapshot.cpp
+```
+
+Verify the generated `Genesis:` line matches `CURRENCY_GENESIS_HASH` before committing.
 
 ## How to test
 
