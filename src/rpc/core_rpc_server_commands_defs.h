@@ -625,6 +625,78 @@ namespace currency
     typedef COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response response;
   };
   //-----------------------------------------------
+
+  // decoy strategy for regular TX
+  #define LOOK_UP_STRATEGY_REGULAR_TX           "LOOK_UP_STRATEGY_REGULAR_TX"
+  // decoy strategy for PoS coinbase
+  #define LOOK_UP_STRATEGY_POS_COINBASE         "LOOK_UP_STRATEGY_POS_COINBASE"
+  // fallback accept any
+  #define LOOK_UP_STRATEGY_ANY                  "LOOK_UP_STRATEGY_ANY"
+  struct COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4
+  {
+    DOC_COMMAND("Version 4 of the command to retrieve random decoy outputs for specified amounts, focusing on either pre-zarcanum or post-zarcanum zones based on the amount value.");
+    struct request_batch
+    {
+      uint64_t input_amount;
+      std::vector<uint64_t> heights;
+      std::vector<uint64_t> global_offsets{};
+      uint64_t ring_size = 0;
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(input_amount)            DOC_DSCR("Amount to be processed in the batch.") DOC_EXMP_AUTO(1000000) DOC_END
+        KV_SERIALIZE(heights)                 DOC_DSCR("Array of heights to be processed in the batch.") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(global_offsets)          DOC_DSCR("Candidate output indices for a nonzero amount, mutually exclusive with heights. Their number is the requested pool size. Out-of-range indices are reduced modulo the current amount count, duplicates and unsuitable outputs are replaced.") DOC_EXMP_AUTO(0) DOC_END
+        KV_SERIALIZE(ring_size)               DOC_DSCR("Requested individual ring size, including the real input, at least 2 and no greater than the candidate count, or 0 for heights.") DOC_EXMP_AUTO(0) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct request
+    {
+      std::vector<request_batch> batches;               // multiple amounts with heights to be processed in a single call
+      uint64_t              height_upper_limit;         // applies to height based batches, ignored for bare index batches
+      std::string           look_up_strategy;           // LOOK_UP_STRATEGY_REGULAR_TX or LOOK_UP_STRATEGY_POS_COINBASE
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(batches)                 DOC_DSCR("List of request batches, each containing an amount and corresponding heights to be processed.") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(height_upper_limit)      DOC_DSCR("Maximum blockchain height for height-based batches. If nonzero, decoys must be at this height or older. Ignored for bare index batches.") DOC_EXMP(2555000) DOC_END
+        KV_SERIALIZE(look_up_strategy)        DOC_DSCR("LOOK_UP_STRATEGY_REGULAR_TX or LOOK_UP_STRATEGY_POS_COINBASE") DOC_EXMP("LOOK_UP_STRATEGY_REGULAR_TX") DOC_END
+
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct outputs_in_block
+    {
+      uint64_t block_height;
+      std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> outs;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(block_height)                      DOC_DSCR("Block's height") DOC_EXMP_AUTO(12345) DOC_END
+        KV_SERIALIZE_CONTAINER_POD_AS_BLOB(outs)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct blocks_batch
+    {
+      std::vector<outputs_in_block> blocks;
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(blocks)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::vector<blocks_batch> blocks_batches; // batches x blocks
+      std::string status;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(blocks_batches)    DOC_DSCR("Blocks collected by node") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(status)            DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+  };
+
+  //-----------------------------------------------
   struct COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_LEGACY
   {
     DOC_COMMAND("Retrieve random decoy outputs for specified amounts (legacy format).");
