@@ -2,6 +2,15 @@ name: PDC Linux GUI
 
 on:
   workflow_dispatch:
+    inputs:
+      arches:
+        description: 'Architectures to build (x64 runs on self-hosted Linux)'
+        type: choice
+        default: all
+        options:
+          - all
+          - x64
+          - arm64
   # Callable from build-all.yml; always builds mainnet.
   workflow_call:
     inputs:
@@ -9,6 +18,10 @@ on:
         description: 'Commit SHA or ref to build (defaults to the triggering commit)'
         type: string
         default: ''
+      arches:
+        description: 'Architectures to build: all | x64 | arm64'
+        type: string
+        default: all
 
 permissions:
   contents: read
@@ -26,14 +39,18 @@ env:
 jobs:
   build:
     name: Linux ${{ matrix.arch }} (mainnet)
-    runs-on: ${{ matrix.runner }}
+    # x64: org self-hosted runner (labels self-hosted/Linux/X64).
+    # arm64: GitHub-hosted (no self-hosted ARM runner registered yet).
+    runs-on: ${{ fromJSON(matrix.runs_on) }}
+    if: ${{ (inputs.arches || 'all') == 'all' || (inputs.arches || 'all') == matrix.arch }}
     timeout-minutes: 300
     strategy:
       fail-fast: false
       matrix:
         include:
           - arch: x64
-            runner: ubuntu-22.04
+            runs_on: '["self-hosted", "Linux", "X64"]'
+            cache_key: self-hosted-linux-x64
             cmake_arch: x86-64
             boost_arch: x86
             openssl_target: linux-x86_64
@@ -41,12 +58,13 @@ jobs:
             qt_arch: linux_gcc_64
             appimage_arch: x86_64
             elf_machine: Advanced Micro Devices X86-64
-            baseline: Ubuntu 22.04 / glibc 2.35
+            baseline: Ubuntu 24.04 self-hosted / glibc 2.39
             linuxdeploy_sha256: c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d
             linuxdeploy_qt_sha256: 15106be885c1c48a021198e7e1e9a48ce9d02a86dd0a1848f00bdbf3c1c92724
             appimagetool_sha256: ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0
           - arch: arm64
-            runner: ubuntu-24.04-arm
+            runs_on: '"ubuntu-24.04-arm"'
+            cache_key: ubuntu-24.04-arm
             cmake_arch: default
             boost_arch: arm
             openssl_target: linux-aarch64
@@ -107,7 +125,7 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ env.DEPS_DIR }}
-          key: deps-${{ matrix.runner }}-${{ matrix.arch }}-boost${{ env.BOOST_VERSION }}-openssl${{ env.OPENSSL_VERSION }}-linux-rtstatic-v2
+          key: deps-${{ matrix.cache_key }}-${{ matrix.arch }}-boost${{ env.BOOST_VERSION }}-openssl${{ env.OPENSSL_VERSION }}-linux-rtstatic-v2
 
       - name: Build Boost and OpenSSL (static)
         if: steps.deps-cache.outputs.cache-hit != 'true'
@@ -773,11 +791,12 @@ jobs:
           if-no-files-found: error
           compression-level: 0
 
-  # x64 images are built on Ubuntu 22.04 (glibc 2.35). Smoke them on a newer
-  # runner so NSS/systemd regressions that only show on 24.04+ fail CI early.
+  # x64 images are built on the self-hosted Ubuntu 24.04 runner. Smoke on a
+  # GitHub-hosted 24.04 image to catch host/runtime packaging issues early.
   smoke-ubuntu-2404-x64:
     name: Smoke AppImage on Ubuntu 24.04 (x64)
     needs: build
+    if: ${{ always() && !cancelled() && needs.build.result == 'success' && ((inputs.arches || 'all') == 'all' || (inputs.arches || 'all') == 'x64') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
