@@ -5,6 +5,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 
+#include <atomic>
+
 #include "include_base_utils.h"
 using namespace epee;
 
@@ -23,8 +25,10 @@ DISABLE_VS_WARNINGS(4244)
 POP_VS_WARNINGS
 #include "crypto/bitcoin/sha256_helper.h"
 
-// get_tick_count() returns milliseconds; keep salts for one hour.
-#define JWT_TOKEN_EXPIRATION_MAXIMUM          (60ull * 60ull * 1000ull)
+// get_tick_count() returns milliseconds. Keep used salts for the Companion
+// session window (10 min) so anti-replay matches JWT exp and salts do not
+// accumulate for a full hour (which previously hit overwhelm and broke auth).
+#define JWT_TOKEN_EXPIRATION_MAXIMUM          (10ull * 60ull * 1000ull)
 #define JWT_TOKEN_CLAIM_NAME_BODY_HASH        "body_hash"
 #define JWT_TOKEN_CLAIM_NAME_SALT             "salt"
 #define JWT_TOKEN_CLAIM_NAME_EXPIRATION       "exp"     
@@ -252,6 +256,9 @@ namespace tools
         throw std::runtime_error("Body hash missmatch");
       }
 
+      uint64_t ticks_now = epee::misc_utils::get_tick_count();
+      // Prune first — expired salts must not count toward overwhelm / reuse.
+      m_jwt_used_salts.remove_if_expiration_less_than(ticks_now);
       if(m_jwt_used_salts.get_set().size() > JWT_TOKEN_OVERWHELM_LIMIT)
       {
         throw std::runtime_error("Salt is overwhelmed");
@@ -261,24 +268,36 @@ namespace tools
         throw std::runtime_error("Salt reused");
       }
 
-      uint64_t ticks_now = epee::misc_utils::get_tick_count();
       if(!m_jwt_used_salts.add(salt, ticks_now + JWT_TOKEN_EXPIRATION_MAXIMUM))
       {
         throw std::runtime_error("Salt reused");
       }
-      m_jwt_used_salts.remove_if_expiration_less_than(ticks_now);
 
       LOG_PRINT_L3("JWT token OK");
       return true;
     }
     catch(const std::exception& e)
     {
-      LOG_ERROR("Invalid JWT token: " << e.what());
+      // Expected auth failures (bad/missing/reused/overwhelmed salt). Never LOG_ERROR here:
+      // that dumps a full callstack per request and was filling multi-GB wallet logs
+      // when Companion/extension traffic hit JWT_TOKEN_OVERWHELM_LIMIT.
+      static std::atomic<uint64_t> s_jwt_fail_count{0};
+      static std::atomic<uint64_t> s_jwt_last_log_ms{0};
+      const uint64_t n = ++s_jwt_fail_count;
+      const uint64_t now = epee::misc_utils::get_tick_count();
+      uint64_t prev = s_jwt_last_log_ms.load(std::memory_order_relaxed);
+      if (n == 1 || now - prev >= 10000)
+      {
+        if (s_jwt_last_log_ms.compare_exchange_strong(prev, now) || n == 1)
+        {
+          LOG_PRINT("Invalid JWT token: " << e.what() << " (auth failures: " << n << ")", LOG_LEVEL_1);
+        }
+      }
       return false;
     }
     catch(...)
     {
-      LOG_ERROR("Invalid JWT token: unknown exception");
+      LOG_PRINT("Invalid JWT token: unknown exception", LOG_LEVEL_1);
       return false;
     }
 
