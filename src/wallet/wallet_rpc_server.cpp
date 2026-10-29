@@ -340,6 +340,12 @@ namespace tools
     return m_jwt_secret;
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::jwt_auth_required() const
+  {
+    std::lock_guard<std::mutex> lock(m_jwt_salts_lock);
+    return !m_jwt_secret.empty();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_getbalance(const wallet_public::COMMAND_RPC_GET_BALANCE::request& req, wallet_public::COMMAND_RPC_GET_BALANCE::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();

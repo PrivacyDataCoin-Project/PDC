@@ -51,6 +51,15 @@ MARK_AS_POD_C11(macro_alias_1);
 
 namespace currency
 {
+  // How many items to return from a sequence of `size` elements starting at
+  // `start_offset`. Saturates instead of wrapping `start_offset + count`.
+  inline uint64_t clamp_rpc_range_count(uint64_t start_offset, uint64_t count, uint64_t size)
+  {
+    if (count == 0 || start_offset >= size)
+      return 0;
+    const uint64_t available = size - start_offset;
+    return count > available ? available : count;
+  }
 
   // blue core
 

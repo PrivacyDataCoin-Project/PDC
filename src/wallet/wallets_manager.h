@@ -221,6 +221,12 @@ private:
 //#endif
   //--------
 
+  virtual bool handle_http_request(const epee::net_utils::http::http_request_info& query_info,
+    epee::net_utils::http::http_response_info& response_info,
+    epee::net_utils::connection_context_base& conn_context,
+    bool& call_found,
+    documentation& docs = epee::net_utils::http::i_chain_handler::m_empty_documentation) override;
+
   BEGIN_URI_MAP2_VIRTUAL()
     BEGIN_JSON_RPC_MAP("/json_rpc")
       //MULTIWALLET APIs

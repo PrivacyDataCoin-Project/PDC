@@ -3237,8 +3237,7 @@ bool wallet2::store_keys(std::string& buff, const std::string& password, wallet2
   keys_file_data.account_data = cipher;
 
   r = ::serialization::dump_binary(keys_file_data, buff);
-
-  return true;
+  return r;
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::backup_keys(const std::string& path)
@@ -3564,8 +3563,9 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
   data_file << header_buff << keys_buff;
 
   WLT_LOG_L0("Storing to temporary file " << tmp_file_path.string() << " ...");
-  //creating encryption stream
-  tools::encrypt_chacha_out_filter decrypt_filter(m_password, keys_file_data.iv);
+  // Body and keys must use the same password. Callers such as
+  // store_watch_only pass `password` on a wallet whose m_password was not set.
+  tools::encrypt_chacha_out_filter decrypt_filter(password, keys_file_data.iv);
   boost::iostreams::filtering_ostream out;
   out.push(decrypt_filter);
   out.push(data_file);

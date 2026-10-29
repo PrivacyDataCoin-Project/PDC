@@ -2179,6 +2179,49 @@ bool wallets_manager::on_mw_select_wallet(uint64_t wallet_id)
 }
 
 
+namespace
+{
+  // Same JSON-RPC method extraction as BEGIN_JSON_RPC_MAP. A substring check
+  // would miss a body the portable storage parser still accepts.
+  bool json_rpc_method(const epee::net_utils::http::http_request_info& query_info, std::string& method)
+  {
+    method.clear();
+    if (query_info.m_URI != "/json_rpc")
+      return false;
+    epee::serialization::portable_storage ps;
+    if (!ps.load_from_json(query_info.m_body))
+      return false;
+    return ps.get_value("method", method, nullptr);
+  }
+}
+
+bool wallets_manager::handle_http_request(const epee::net_utils::http::http_request_info& query_info,
+  epee::net_utils::http::http_response_info& response_info,
+  epee::net_utils::connection_context_base& conn_context,
+  bool& call_found,
+  documentation& docs)
+{
+  // mw_* are dispatched on this map, before the chain into wallet_rpc_server,
+  // so they never reached wallet_rpc_server::handle_http_request. When a JWT
+  // secret is set, require the same check here. Other methods stay on the
+  // chain and are authenticated once, there.
+  std::string method;
+  const bool mw_method = json_rpc_method(query_info, method)
+    && (method == "mw_get_wallets" || method == "mw_select_wallet");
+  if (mw_method && conn_context.m_connection_id != RPC_INTERNAL_UI_CONTEXT && m_wallet_rpc_server.jwt_auth_required())
+  {
+    if (!m_wallet_rpc_server.auth_http_request(query_info, response_info, conn_context))
+    {
+      call_found = true;
+      response_info.m_response_code = 401;
+      response_info.m_response_comment = "Unauthorized";
+      return true;
+    }
+  }
+
+  return epee::net_utils::http::i_chain_handler::handle_http_request(query_info, response_info, conn_context, call_found, docs);
+}
+
 bool wallets_manager::on_mw_get_wallets(const tools::wallet_public::COMMAND_MW_GET_WALLETS::request& req, tools::wallet_public::COMMAND_MW_GET_WALLETS::response& res, epee::json_rpc::error& er, epee::net_utils::connection_context_base& cntx)
 {
   this->on_mw_get_wallets(res.wallets);
