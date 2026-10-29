@@ -13,17 +13,9 @@ on:
   workflow_dispatch:
     inputs:
       linux:
-        description: 'Linux (x64 on self-hosted)'
+        description: 'Linux'
         type: boolean
         default: true
-      linux_arches:
-        description: 'Linux arches (x64 = self-hosted only)'
-        type: choice
-        default: all
-        options:
-          - all
-          - x64
-          - arm64
       windows:
         description: 'Windows'
         type: boolean
@@ -80,7 +72,6 @@ jobs:
     uses: ./.github/workflows/build-linux.yml
     with:
       ref: ${{ github.sha }}
-      arches: ${{ github.event_name == 'workflow_dispatch' && inputs.linux_arches || 'all' }}
     permissions:
       contents: read
 

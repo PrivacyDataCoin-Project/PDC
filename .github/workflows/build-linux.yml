@@ -2,15 +2,6 @@ name: PDC Linux GUI
 
 on:
   workflow_dispatch:
-    inputs:
-      arches:
-        description: 'Architectures to build (x64 runs on self-hosted Linux)'
-        type: choice
-        default: all
-        options:
-          - all
-          - x64
-          - arm64
   # Callable from build-all.yml; always builds mainnet.
   workflow_call:
     inputs:
@@ -18,10 +9,6 @@ on:
         description: 'Commit SHA or ref to build (defaults to the triggering commit)'
         type: string
         default: ''
-      arches:
-        description: 'Architectures to build: all | x64 | arm64'
-        type: string
-        default: all
 
 permissions:
   contents: read
@@ -37,81 +24,40 @@ env:
   APPIMAGETOOL_VERSION: '1.9.1'
 
 jobs:
-  select-matrix:
-    name: Select Linux arches
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      matrix: ${{ steps.set.outputs.matrix }}
-      build_x64: ${{ steps.set.outputs.build_x64 }}
-    steps:
-      - name: Build matrix JSON
-        id: set
-        env:
-          ARCHES: ${{ inputs.arches || 'all' }}
-        run: |
-          set -euo pipefail
-          case "$ARCHES" in
-            all|x64|arm64) ;;
-            *)
-              echo "::error::Invalid arches='$ARCHES' (expected all|x64|arm64)"
-              exit 1
-              ;;
-          esac
-
-          python3 - <<'PY' >> "$GITHUB_OUTPUT"
-          import json, os
-          arches = os.environ["ARCHES"]
-          rows = {
-            "x64": {
-              "arch": "x64",
-              "runs_on": ["self-hosted", "Linux", "X64"],
-              "cache_key": "self-hosted-linux-x64",
-              "cmake_arch": "x86-64",
-              "boost_arch": "x86",
-              "openssl_target": "linux-x86_64",
-              "qt_host": "linux",
-              "qt_arch": "linux_gcc_64",
-              "appimage_arch": "x86_64",
-              "elf_machine": "Advanced Micro Devices X86-64",
-              "baseline": "Ubuntu 24.04 self-hosted / glibc 2.39",
-              "linuxdeploy_sha256": "c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d",
-              "linuxdeploy_qt_sha256": "15106be885c1c48a021198e7e1e9a48ce9d02a86dd0a1848f00bdbf3c1c92724",
-              "appimagetool_sha256": "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0",
-            },
-            "arm64": {
-              "arch": "arm64",
-              "runs_on": "ubuntu-24.04-arm",
-              "cache_key": "ubuntu-24.04-arm",
-              "cmake_arch": "default",
-              "boost_arch": "arm",
-              "openssl_target": "linux-aarch64",
-              "qt_host": "linux_arm64",
-              "qt_arch": "linux_gcc_arm64",
-              "appimage_arch": "aarch64",
-              "elf_machine": "AArch64",
-              "baseline": "Ubuntu 24.04 / glibc 2.39",
-              "linuxdeploy_sha256": "620095110d693282b8ebeb244a95b5e911cf8f65f76c88b4b47d16ae6346fcff",
-              "linuxdeploy_qt_sha256": "bf1c24aff6d749b5cf423afad6f15abd4440f81dec1aab95706b25f6667cdcf1",
-              "appimagetool_sha256": "f0837e7448a0c1e4e650a93bb3e85802546e60654ef287576f46c71c126a9158",
-            },
-          }
-          selected = ["x64", "arm64"] if arches == "all" else [arches]
-          include = [rows[a] for a in selected]
-          print(f"matrix={json.dumps({'include': include})}")
-          print(f"build_x64={'true' if 'x64' in selected else 'false'}")
-          PY
-
   build:
     name: Linux ${{ matrix.arch }} (mainnet)
-    # x64: org self-hosted runner (labels self-hosted/Linux/X64).
-    # arm64: GitHub-hosted (no self-hosted ARM runner registered yet).
-    needs: select-matrix
-    runs-on: ${{ matrix.runs_on }}
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 300
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.select-matrix.outputs.matrix) }}
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-22.04
+            cmake_arch: x86-64
+            boost_arch: x86
+            openssl_target: linux-x86_64
+            qt_host: linux
+            qt_arch: linux_gcc_64
+            appimage_arch: x86_64
+            elf_machine: Advanced Micro Devices X86-64
+            baseline: Ubuntu 22.04 / glibc 2.35
+            linuxdeploy_sha256: c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d
+            linuxdeploy_qt_sha256: 15106be885c1c48a021198e7e1e9a48ce9d02a86dd0a1848f00bdbf3c1c92724
+            appimagetool_sha256: ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            cmake_arch: default
+            boost_arch: arm
+            openssl_target: linux-aarch64
+            qt_host: linux_arm64
+            qt_arch: linux_gcc_arm64
+            appimage_arch: aarch64
+            elf_machine: AArch64
+            baseline: Ubuntu 24.04 / glibc 2.39
+            linuxdeploy_sha256: 620095110d693282b8ebeb244a95b5e911cf8f65f76c88b4b47d16ae6346fcff
+            linuxdeploy_qt_sha256: bf1c24aff6d749b5cf423afad6f15abd4440f81dec1aab95706b25f6667cdcf1
+            appimagetool_sha256: f0837e7448a0c1e4e650a93bb3e85802546e60654ef287576f46c71c126a9158
     env:
       DEPS_DIR: ${{ github.workspace }}/_deps-linux
       BUILD_DIR: ${{ github.workspace }}/build-linux
@@ -161,7 +107,7 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ env.DEPS_DIR }}
-          key: deps-${{ matrix.cache_key }}-${{ matrix.arch }}-boost${{ env.BOOST_VERSION }}-openssl${{ env.OPENSSL_VERSION }}-linux-rtstatic-v2
+          key: deps-${{ matrix.runner }}-${{ matrix.arch }}-boost${{ env.BOOST_VERSION }}-openssl${{ env.OPENSSL_VERSION }}-linux-rtstatic-v2
 
       - name: Build Boost and OpenSSL (static)
         if: steps.deps-cache.outputs.cache-hit != 'true'
@@ -246,7 +192,7 @@ jobs:
           arch: ${{ matrix.qt_arch }}
           modules: 'qtwebengine qtwebchannel qtpositioning qtserialport'
           cache: true
-          cache-key-prefix: qt-${{ matrix.cache_key }}-${{ matrix.qt_arch }}
+          cache-key-prefix: qt-${{ matrix.runner }}-${{ matrix.qt_arch }}
           aqtversion: '==3.3.0'
           py7zrversion: '==1.0.0'
 
@@ -827,12 +773,11 @@ jobs:
           if-no-files-found: error
           compression-level: 0
 
-  # x64 images are built on the self-hosted Ubuntu 24.04 runner. Smoke on a
-  # GitHub-hosted 24.04 image to catch host/runtime packaging issues early.
+  # x64 images are built on Ubuntu 22.04 (glibc 2.35). Smoke them on a newer
+  # runner so NSS/systemd regressions that only show on 24.04+ fail CI early.
   smoke-ubuntu-2404-x64:
     name: Smoke AppImage on Ubuntu 24.04 (x64)
-    needs: [select-matrix, build]
-    if: ${{ always() && !cancelled() && needs.build.result == 'success' && needs.select-matrix.outputs.build_x64 == 'true' }}
+    needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
