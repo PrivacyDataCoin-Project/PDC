@@ -363,7 +363,7 @@ namespace currency
     {
       res.blocks.emplace_back();
       auto& entry = res.blocks.back();
-      entry.compact = req.m_return_compact;
+      entry.compact = !req.m_return_legacy_full;
       if (entry.compact)
       {
         block compact_block = b.first->bl;

@@ -75,3 +75,8 @@ follow-up once the AMOUNTS4 daemon path is exercised in this tree.
 - Prefer keeping `core_rpc_proxy.h` (do not rename to Zano's `i_core_rpc_proxy.h`).
 - Wallet CMake uses `GLOB_RECURSE` over `src/wallet/*`; new `.cpp` files are picked up automatically.
 - Unit tests under `tests/unit_tests/` are also globbed by `tests/CMakeLists.txt`.
+
+## Follow-ups (after this PR)
+
+See [`docs/zano-backports/NEXT_AFTER_PR8.md`](zano-backports/NEXT_AFTER_PR8.md).
+Next code backport: Zano **#772** (`m_return_legacy_full`). #767 / #769 / #770 already present in PDC.

@@ -1,0 +1,24 @@
+diff --git a/contrib/epee/include/net/net_helper.h b/contrib/epee/include/net/net_helper.h
+index e5c0dd2ca..fbd57e8b8 100644
+--- a/contrib/epee/include/net/net_helper.h
++++ b/contrib/epee/include/net/net_helper.h
+@@ -722,6 +722,7 @@ namespace epee
+             if (ec == boost::asio::error::eof)
+             {
+               LOG_PRINT_L4("Connection err_code eof.");
++              m_connected = false;
+               //connection closed there, empty
+               return true;
+             }
+diff --git a/src/wallet/wallet2.cpp b/src/wallet/wallet2.cpp
+index 967af00de..dd8fad745 100644
+--- a/src/wallet/wallet2.cpp
++++ b/src/wallet/wallet2.cpp
+@@ -2799,6 +2799,7 @@ void wallet2::refresh(size_t& blocks_fetched, bool& received_money, std::atomic<
+     {
+       bool full_reset_needed = false;
+       pull_blocks(added_blocks, stop, full_reset_needed);
++      try_count = 0;
+       if (full_reset_needed)
+       {
+         if (reset_count > 1)

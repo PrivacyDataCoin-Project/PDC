@@ -1,0 +1,174 @@
+diff --git a/src/rpc/core_rpc_server.cpp b/src/rpc/core_rpc_server.cpp
+index a21ac763b..f3a2abf3b 100644
+--- a/src/rpc/core_rpc_server.cpp
++++ b/src/rpc/core_rpc_server.cpp
+@@ -342,7 +342,7 @@ namespace currency
+ 
+     if(!req.m_return_compact)
+     {
+-      // if not compact than it's an old client, drop connection.
++      // if not compact than it's an old client, drop connection, m_return_compact is now only a compatibility flag
+       res.status = API_RETURN_CODE_GENESIS_MISMATCH;
+       return true;
+     }
+@@ -393,7 +393,7 @@ namespace currency
+     CHECK_RPC_LIMITS(req.block_ids.size(), RPC_LIMIT_COMMAND_RPC_GET_BLOCKS_DIRECT_BLOCK_IDS);
+     if (!req.m_return_compact)
+     {
+-      // if not compact than it's an old client, drop connection.
++      // if not compact than it's an old client, drop connection, m_return_compact is now only a compatibility flag
+       res.status = API_RETURN_CODE_GENESIS_MISMATCH;
+       return true;
+     }
+@@ -435,7 +435,7 @@ namespace currency
+     {
+       res.blocks.emplace_back();
+       auto& entry = res.blocks.back();
+-      entry.compact = req.m_return_compact;
++      entry.compact = !req.m_return_legacy_full;
+       if (entry.compact)
+       {
+         block compact_block = b.first->bl;
+diff --git a/src/rpc/core_rpc_server_commands_defs.h b/src/rpc/core_rpc_server_commands_defs.h
+index 4648622e5..be1eb7644 100644
+--- a/src/rpc/core_rpc_server_commands_defs.h
++++ b/src/rpc/core_rpc_server_commands_defs.h
+@@ -268,13 +268,17 @@ namespace currency
+     {
+       uint64_t minimum_height;
+       std::list<crypto::hash> block_ids;
++      // the emergency old client cutoff reused m_return_compact as a compatibility flag
++      // TODO: remove it once the cutoff is retired, m_return_legacy_full selects the response format
+       bool m_return_compact = false;
++      bool m_return_legacy_full = false;
+       std::string m_client_version;
+ 
+       BEGIN_KV_SERIALIZE_MAP()
+         KV_SERIALIZE(minimum_height)                  DOC_DSCR("The minimum height of the returning buch of blocks.") DOC_EXMP(0) DOC_END
+         KV_SERIALIZE_CONTAINER_POD_AS_BLOB(block_ids) /* TODO !!! DOC_DSCR("Current state of the local blockchain. Hashes of the most recent 10 blocks goes first, then each 2nd, then 4th, 8, 16, 32, 64 and so on, and the last one is always hash of the genesis block.") DOC_END */
+         KV_SERIALIZE(m_return_compact)
++        KV_SERIALIZE(m_return_legacy_full)
+         KV_SERIALIZE(m_client_version)
+       END_KV_SERIALIZE_MAP()
+     };
+diff --git a/src/wallet/core_default_rpc_proxy.cpp b/src/wallet/core_default_rpc_proxy.cpp
+index 7ca31a6af..12b10bd5d 100644
+--- a/src/wallet/core_default_rpc_proxy.cpp
++++ b/src/wallet/core_default_rpc_proxy.cpp
+@@ -45,6 +45,7 @@ namespace tools
+     req.block_ids = rqt.block_ids;
+     req.minimum_height = rqt.minimum_height;
+     req.m_return_compact = rqt.m_return_compact;
++    req.m_return_legacy_full = rqt.m_return_legacy_full;
+     currency::COMMAND_RPC_GET_BLOCKS_FAST::response res = AUTO_VAL_INIT(res);
+     bool r = call_COMMAND_RPC_GET_BLOCKS_FAST(req, res);
+     rsp.status = res.status;
+diff --git a/src/wallet/wallet2.cpp b/src/wallet/wallet2.cpp
+index 967af00de..cba64c2ed 100644
+--- a/src/wallet/wallet2.cpp
++++ b/src/wallet/wallet2.cpp
+@@ -1850,7 +1850,8 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop, bool& f
+ 
+   req.m_client_version = PROJECT_VERSION_LONG;
+   req.minimum_height = get_wallet_minimum_height();
+-  req.m_return_compact = m_compact_sync;
++  req.m_return_compact = true;
++  req.m_return_legacy_full = !m_compact_sync;
+   if (req.minimum_height > m_height_of_start_sync)
+     m_height_of_start_sync = req.minimum_height;
+ 
+diff --git a/src/wallet/wallet2.h b/src/wallet/wallet2.h
+index c627d1b1e..b5a058d29 100644
+--- a/src/wallet/wallet2.h
++++ b/src/wallet/wallet2.h
+@@ -812,7 +812,7 @@ namespace tools
+     //performance inefficient call, suitable only for rare ocasions or super lazy developers
+     bool proxy_to_daemon(const std::string& uri, const std::string& body, int& response_code, std::string& response_body);
+     void set_concise_mode(bool enabled) { m_concise_mode = enabled; }
+-    // сallers opt in, older daemons ignore the request flag and return full blocks
++    // compact is the default, disabling it requests legacy full block responses
+     void set_compact_sync(bool enabled) { m_compact_sync = enabled; }
+     bool get_compact_sync() const { return m_compact_sync; }
+     void set_concise_mode_reorg_max_reorg_blocks(uint64_t max_blocks) { m_wallet_concise_mode_max_reorg_blocks = max_blocks; }
+diff --git a/tests/core_tests/wallet_tests.cpp b/tests/core_tests/wallet_tests.cpp
+index 5b7d8be7a..472dfe724 100644
+--- a/tests/core_tests/wallet_tests.cpp
++++ b/tests/core_tests/wallet_tests.cpp
+@@ -4213,17 +4213,17 @@ namespace
+       if (req.block_ids.size() == 1)
+         ++genesis_requests;
+ 
+-      if (!m_force_compact && !req.m_return_compact)
+-      {
++      const bool return_compact = m_force_compact || !req.m_return_legacy_full;
++      if (return_compact)
++        ++compact_requests;
++      else
+         ++full_requests;
+-        return m_inner->call_COMMAND_RPC_GET_BLOCKS_DIRECT(req, res);
+-      }
+-      ++compact_requests;
+ 
+       COMMAND_RPC_GET_BLOCKS_FAST::request wire_req{};
+       wire_req.minimum_height = req.minimum_height;
+       wire_req.block_ids = req.block_ids;
+-      wire_req.m_return_compact = true;
++      wire_req.m_return_compact = req.m_return_compact;
++      wire_req.m_return_legacy_full = !return_compact;
+       COMMAND_RPC_GET_BLOCKS_FAST::response wire_res{};
+       CHECK_AND_ASSERT_MES(m_inner->call_COMMAND_RPC_GET_BLOCKS_FAST(wire_req, wire_res), false, "compact RPC request failed");
+       res.status = wire_res.status;
+@@ -4236,7 +4236,9 @@ namespace
+       for (const auto& entry : res.blocks)
+       {
+         const uint64_t height = get_block_height(entry.block_ptr->bl);
+-        CHECK_AND_ASSERT_MES(entry.compact, false, "compact RPC must trim every block, including genesis and the tip");
++        CHECK_AND_ASSERT_MES(entry.compact == return_compact, false, "block representation does not match the request");
++        if (!return_compact)
++          continue;
+         const auto& miner_tx = entry.block_ptr->bl.miner_tx;
+         CHECK_AND_ASSERT_MES(miner_tx.signatures.empty() && miner_tx.proofs.empty(), false, "coinbase was not compact");
+         for (const auto& tx : entry.txs_ptr)
+@@ -4379,6 +4381,18 @@ bool wallet_compact_sync::generate(std::vector<test_event_entry>& events) const
+ 
+ bool wallet_compact_sync::check_sync(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+ {
++  // the legacy full flag must not bypass the emergency old client cutoff
++  {
++    COMMAND_RPC_GET_BLOCKS_FAST::request req{};
++    req.block_ids.push_back(get_block_hash(boost::get<block>(events.front())));
++    for (bool legacy_full : {false, true})
++    {
++      req.m_return_legacy_full = legacy_full;
++      COMMAND_RPC_GET_BLOCKS_FAST::response res{};
++      CHECK_AND_ASSERT_MES(m_core_proxy->call_COMMAND_RPC_GET_BLOCKS_FAST(req, res) && res.status == API_RETURN_CODE_GENESIS_MISMATCH,
++        false, "old client was not rejected");
++    }
++  }
+   auto proxy = std::make_shared<compact_sync_test_proxy>(m_core_proxy);
+   auto full = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+   auto compact = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+@@ -4454,6 +4468,23 @@ bool wallet_compact_sync::check_sync(currency::core& c, size_t ev_index, const s
+   CHECK_AND_ASSERT_MES(compare_wallet_sync_state(*full, *compact), false, "recent compact transaction mismatch");
+   const auto spend_tx_hash = get_transaction_hash(spend_tx);
+   const auto recent_tx_hash = get_transaction_hash(recent_tx);
++  // full wire responses must preserve the signed transaction, including its proofs
++  {
++    COMMAND_RPC_GET_BLOCKS_FAST::request req{};
++    req.block_ids.push_back(get_block_hash(boost::get<block>(events.front())));
++    req.m_return_compact = true;
++    req.m_return_legacy_full = true;
++    COMMAND_RPC_GET_BLOCKS_FAST::response res{};
++    CHECK_AND_ASSERT_MES(m_core_proxy->call_COMMAND_RPC_GET_BLOCKS_FAST(req, res) && res.status == API_RETURN_CODE_OK, false, "legacy full RPC request failed");
++    const auto spend_blob = tx_to_blob(spend_tx);
++    bool full_spend_found = false;
++    for (const auto& entry : res.blocks)
++    {
++      CHECK_AND_ASSERT_MES(!entry.compact, false, "legacy full RPC returned compact blocks");
++      full_spend_found |= std::find(entry.txs.begin(), entry.txs.end(), spend_blob) != entry.txs.end();
++    }
++    CHECK_AND_ASSERT_MES(full_spend_found, false, "legacy full RPC lost the complete signed transaction");
++  }
+   CHECK_AND_ASSERT_MES(compact_sender->m_unconfirmed_txs.count(spend_tx_hash) == 0, false, "confirmed outgoing payment remained pending");
+   const auto check_complete_confirmed_spend = [&]() -> bool
+   {
