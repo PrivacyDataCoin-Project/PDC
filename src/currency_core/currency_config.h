@@ -21,9 +21,14 @@
 #define CURRENCY_TX_MIN_ALLOWED_OUTS                    2      // effective starting HF4 Zarcanum
 #define CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX           0x1989   // addresses start with 'Px'
 #define CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX     0x32f7 // integrated addresses start with 'iP'
-#define CURRENCY_PUBLIC_INTEG_ADDRESS_V2_BASE58_PREFIX  0x32f7 // integrated addresses start with 'iP' (new format)
+#define CURRENCY_PUBLIC_INTEG_ADDRESS_V2_BASE58_PREFIX  0x3377 // integrated addresses start with 'iP' (new format; distinct tag like Zano V1+0x80)
 #define CURRENCY_PUBLIC_AUDITABLE_ADDRESS_BASE58_PREFIX 0x54c7 // auditable addresses start with 'aPx'
 #define CURRENCY_PUBLIC_AUDITABLE_INTEG_ADDRESS_BASE58_PREFIX 0x1d87c9 // auditable integrated addresses start with 'aiPX'
+
+// Classic vs new-format integrated addresses share the text prefix "iP" but must use distinct
+// numeric tags so decode can choose old (no flags) vs new (with flags) payload layout.
+static_assert(CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX != CURRENCY_PUBLIC_INTEG_ADDRESS_V2_BASE58_PREFIX,
+  "integrated address V1/V2 base58 tags must differ");
 #define CURRENCY_MINED_MONEY_UNLOCK_WINDOW              10
 #define CURRENT_TRANSACTION_VERSION                     2
 #define TRANSACTION_VERSION_INITAL                      0

@@ -588,7 +588,7 @@ addr_entry_t addr_entries[] =
       "Px"
     },
     {
-      // new format integrated address with custom flags
+      // new format integrated address with custom flags (V2 tag; still text-prefixed iP)
       "a3f208c8f9ba49bab28eed62b35b0f6be0a297bcd85c2faa1eb1820527bcf7e3",
       "9f5e1fa93630d4b281b18bb67a3db79e9622fc703cc3ad4a453a82e0a36d51fa",
       "3ba0527bcfb1fa93630d28eed6",
