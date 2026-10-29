@@ -55,7 +55,7 @@ public:
   {
     currency::core_runtime_config core_conf;
     epee::locked_object<std::shared_ptr<tools::wallet2>, wallet_lock_time_watching_policy> w;
-    std::shared_ptr<tools::i_wallet2_callback> w_cb; // not using locked_object here, cuz w_cb is accessed only via it's wallet -- sowle
+    std::shared_ptr<i_wallet_to_i_backend_adapter> w_cb; // assigned before the worker starts, long_refresh_in_progress is atomic
     typedef epee::locked_object<std::shared_ptr<tools::wallet2>, wallet_lock_time_watching_policy>::lock_shared_ptr wallet_lock_object;
     std::shared_ptr<tools::wallet_rpc_server> rpc_wrapper; //500 bytes of extra data, we can afford it, to have rpc-like invoke map
     std::atomic<bool> do_mining;
@@ -204,10 +204,10 @@ private:
 
   //----- i_backend_wallet_callback ------
   virtual void on_new_block(size_t wallet_id, uint64_t height, const currency::block& block) override;
-  virtual void on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined) override;
+  virtual void on_transfer2(size_t wallet_id, const tools::wallet2& wallet, const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined, bool is_wallet_in_sync_process) override;
   virtual void on_pos_block_found(size_t wallet_id, const currency::block& /*block*/) override;
   virtual void on_sync_progress(size_t wallet_id, const uint64_t& /*percents*/) override;
-  virtual void on_transfer_canceled(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti) override;
+  virtual void on_transfer_canceled(size_t wallet_id, const tools::wallet2& wallet, const tools::wallet_public::wallet_transfer_info& wti) override;
   virtual void on_tor_status_change(size_t wallet_id, const std::string& state) override;
 
   virtual void on_mw_get_wallets(std::vector<tools::wallet_public::wallet_entry_info>& wallets) override;
@@ -220,6 +220,12 @@ private:
   virtual std::shared_ptr<tools::wallet2> get_wallet() override;
 //#endif
   //--------
+
+  virtual bool handle_http_request(const epee::net_utils::http::http_request_info& query_info,
+    epee::net_utils::http::http_response_info& response_info,
+    epee::net_utils::connection_context_base& conn_context,
+    bool& call_found,
+    documentation& docs = epee::net_utils::http::i_chain_handler::m_empty_documentation) override;
 
   BEGIN_URI_MAP2_VIRTUAL()
     BEGIN_JSON_RPC_MAP("/json_rpc")

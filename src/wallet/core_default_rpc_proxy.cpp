@@ -44,6 +44,7 @@ namespace tools
     req.block_ids = rqt.block_ids;
     req.minimum_height = rqt.minimum_height;
     req.m_return_compact = rqt.m_return_compact;
+    req.m_return_legacy_full = rqt.m_return_legacy_full;
     currency::COMMAND_RPC_GET_BLOCKS_FAST::response res = AUTO_VAL_INIT(res);
     bool r = call_COMMAND_RPC_GET_BLOCKS_FAST(req, res);
     rsp.status = res.status;
@@ -105,6 +106,11 @@ namespace tools
   bool default_http_core_proxy::call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request& req, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::response& res)
   {
     return invoke_http_bin_remote_command2_update_is_disconnect("/getrandom_outs3.bin", req, res);
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool default_http_core_proxy::call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& res)
+  {
+    return invoke_http_bin_remote_command2_update_is_disconnect("/getrandom_outs4.bin", req, res);
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool default_http_core_proxy::call_COMMAND_RPC_SEND_RAW_TX(const currency::COMMAND_RPC_SEND_RAW_TX::request& req, currency::COMMAND_RPC_SEND_RAW_TX::response& res)

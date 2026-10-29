@@ -42,6 +42,7 @@ namespace currency
     bool deinit();
     static void init_options(boost::program_options::options_description& desc);
     bool on_block_chain_update();
+    static constexpr size_t max_mining_threads = 256;
     bool start(const account_public_address& adr, size_t threads_count);
     uint64_t get_speed();
     void send_stop_signal();
