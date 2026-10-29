@@ -544,7 +544,24 @@ namespace net_utils
 		if(!(boost::regex_search( str, result, rexp_mach_field, boost::match_default) && result[0].matched))
 			return false;
 
-		len = boost::lexical_cast<size_t>(result[0]);
+		const std::string digits = result[0].str();
+		// size_t max is 20 decimal digits. Longer values are rejected before the cast.
+		if (digits.size() > 20)
+			return false;
+		try
+		{
+			len = boost::lexical_cast<size_t>(digits);
+		}
+		catch (const std::exception&)
+		{
+			return false;
+		}
+		// Incoming HTTP body cap. Responses are not limited here. 64 MiB is above
+		// any valid RPC request (txs, one block, sync hash lists) and stops a
+		// Content-Length that would pin an HTTP worker or grow without bound.
+		static constexpr size_t max_incoming_http_body = 64ull * 1024ull * 1024ull;
+		if (len > max_incoming_http_body)
+			return false;
 		return true;
 	}
 	//-----------------------------------------------------------------------------------

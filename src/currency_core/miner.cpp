@@ -222,6 +222,11 @@ namespace currency
   {
 
     m_mine_address = adr;
+    if (threads_count > max_mining_threads)
+    {
+      LOG_PRINT_L0("Mining thread count " << threads_count << " exceeds " << max_mining_threads << ", capping");
+      threads_count = max_mining_threads;
+    }
     m_threads_total = static_cast<uint32_t>(threads_count);
     m_starter_nonce = crypto::rand<uint32_t>();
     CRITICAL_REGION_LOCAL(m_threads_lock);

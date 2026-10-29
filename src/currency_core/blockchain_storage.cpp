@@ -2372,8 +2372,9 @@ bool blockchain_storage::get_alt_blocks_rpc_details(uint64_t start_offset, uint6
   if (start_offset >= m_alternative_chains.size() || count == 0)
     return true; // empty result
 
-  if (start_offset + count >= m_alternative_chains.size())
-    count = m_alternative_chains.size() - start_offset; // correct count if it's too big
+  // Do not add start_offset + count: a uint64 wrap skips the clamp and the
+  // later erase() walks off the iterator range.
+  count = clamp_rpc_range_count(start_offset, count, m_alternative_chains.size());
 
   // collect iterators to all the alt blocks for speedy sorting
   std::vector<alt_chain_container::const_iterator> blocks_its;
