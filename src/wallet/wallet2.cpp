@@ -5161,7 +5161,8 @@ bool wallet2::try_mint_pos(const currency::account_public_address& miner_address
   }
   TIME_MEASURE_FINISH_MS(mining_duration_ms);
 
-  WLT_LOG_L0("PoS mining: " << ctx.iterations_processed << " iterations finished (" << std::fixed << std::setprecision(2) << (mining_duration_ms / 1000.0f) << "s), status: " << ctx.status << ", " << ctx.total_items_checked << " entries with total amount: " << print_money_brief(ctx.total_amount_checked));
+  // Per-iteration finish: keep at L1 (same as wallets_manager mint loop) so default LOG_LEVEL_0 stays quiet.
+  WLT_LOG_L1("PoS mining: " << ctx.iterations_processed << " iterations finished (" << std::fixed << std::setprecision(2) << (mining_duration_ms / 1000.0f) << "s), status: " << ctx.status << ", " << ctx.total_items_checked << " entries with total amount: " << print_money_brief(ctx.total_amount_checked));
 
   // Hybrid PoW+PoS: stake outs must originate at or before the last PoW block (and satisfy min_coinstake_age).
   // With only PoS miners and no PoW, newly minted PoS rewards cannot be restaked → 0 entries / NOT_FOUND.
@@ -5170,7 +5171,7 @@ bool wallet2::try_mint_pos(const currency::account_public_address& miner_address
     WLT_LOG_YELLOW("PoS: no stakeable entries (last PoW height=" << m_last_pow_block_h
       << ", tip=" << (get_blockchain_current_size() ? get_blockchain_current_size() - 1 : 0)
       << ", min_coinstake_age=" << m_core_runtime_config.min_coinstake_age
-      << "). Coins created after the last PoW block cannot be staked — need a PoW block to unlock further PoS mining.", LOG_LEVEL_0);
+      << "). Coins created after the last PoW block cannot be staked — need a PoW block to unlock further PoS mining.", LOG_LEVEL_1);
   }
 
   return res;
