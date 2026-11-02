@@ -107,6 +107,7 @@ namespace tools
 
     void set_jwt_secret(const std::string& jwt);
     const std::string& get_jwt_secret();
+    bool jwt_auth_required() const;
 
     BEGIN_URI_MAP2_VIRTUAL()
       BEGIN_JSON_RPC_MAP("/json_rpc")

@@ -1103,7 +1103,7 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
   w->set_use_deffered_global_outputs(m_use_deffered_global_outputs);
   owr.wallet_id = m_wallet_id_counter++;
 
-  std::shared_ptr<tools::i_wallet2_callback> w_cb{new i_wallet_to_i_backend_adapter(this, owr.wallet_id)};
+  std::shared_ptr<i_wallet_to_i_backend_adapter> w_cb{new i_wallet_to_i_backend_adapter(this, owr.wallet_id, w)};
   w->callback(w_cb);
   if (m_remote_node_mode)
   {
@@ -1230,7 +1230,8 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
   w->set_use_deffered_global_outputs(m_use_deffered_global_outputs);
   w->set_votes_config_path(m_data_dir + "/" + CURRENCY_VOTING_CONFIG_DEFAULT_FILENAME);
   owr.wallet_id = m_wallet_id_counter++;
-  w->callback(std::shared_ptr<tools::i_wallet2_callback>(new i_wallet_to_i_backend_adapter(this, owr.wallet_id)));
+  std::shared_ptr<i_wallet_to_i_backend_adapter> w_cb{new i_wallet_to_i_backend_adapter(this, owr.wallet_id, w)};
+  w->callback(w_cb);
   if (m_remote_node_mode)
   {
     w->set_core_proxy(m_rpc_proxy);
@@ -1263,6 +1264,7 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
   wallet_vs_options& wo = m_wallets[owr.wallet_id];
   **wo.w = w;
   wo.wallet_state = view::wallet_status_info::wallet_state_ready;
+  wo.w_cb = w_cb;
   init_wallet_entry(wo, owr.wallet_id);
   get_wallet_info(wo, owr.wi);
   return API_RETURN_CODE_OK;
@@ -1337,7 +1339,8 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
   w->set_use_deffered_global_outputs(m_use_deffered_global_outputs);
   w->set_votes_config_path(m_data_dir + "/" + CURRENCY_VOTING_CONFIG_DEFAULT_FILENAME);
   owr.wallet_id = m_wallet_id_counter++;
-  w->callback(std::shared_ptr<tools::i_wallet2_callback>(new i_wallet_to_i_backend_adapter(this, owr.wallet_id)));
+  std::shared_ptr<i_wallet_to_i_backend_adapter> w_cb{new i_wallet_to_i_backend_adapter(this, owr.wallet_id, w)};
+  w->callback(w_cb);
   if (m_remote_node_mode)
   {
     w->set_core_proxy(m_rpc_proxy);
@@ -1375,6 +1378,7 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
   EXCLUSIVE_CRITICAL_REGION_LOCAL(m_wallets_lock);
   wallet_vs_options& wo = m_wallets[owr.wallet_id];
   **wo.w = w;
+  wo.w_cb = w_cb;
   init_wallet_entry(wo, owr.wallet_id);
   get_wallet_info(wo, owr.wi);
   return API_RETURN_CODE_OK;
@@ -1699,7 +1703,7 @@ std::string wallets_manager::get_wallet_status(uint64_t wallet_id)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
   view::wallet_sync_status_info wsi = AUTO_VAL_INIT(wsi);
-  wsi.is_in_long_refresh = wo.long_refresh_in_progress;
+  wsi.is_in_long_refresh = wo.w_cb ? wo.w_cb->long_refresh_in_progress.load() : wo.long_refresh_in_progress.load();
   wsi.is_daemon_connected = get_is_remote_daemon_connected();
   wsi.progress = wo.w.unlocked_get().get()->get_sync_progress();
   wsi.wallet_state = wo.wallet_state;
@@ -1713,7 +1717,7 @@ std::string wallets_manager::invoke(uint64_t wallet_id, std::string params)
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
 
   CRITICAL_REGION_LOCAL1(wo.long_refresh_in_progress_lock);
-  if (wo.long_refresh_in_progress)
+  if (wo.w_cb ? wo.w_cb->long_refresh_in_progress.load() : wo.long_refresh_in_progress.load())
   {
     epee::json_rpc::response<epee::json_rpc::dummy_result, epee::json_rpc::error> error_response = AUTO_VAL_INIT(error_response);
     error_response.error.code = -1;
@@ -1951,7 +1955,7 @@ std::string wallets_manager::get_wallet_restore_info(uint64_t wallet_id, std::st
 {
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
 
-  if (wo.wallet_state != view::wallet_status_info::wallet_state_ready || wo.long_refresh_in_progress)
+  if (wo.wallet_state != view::wallet_status_info::wallet_state_ready || (wo.w_cb ? wo.w_cb->long_refresh_in_progress.load() : wo.long_refresh_in_progress.load()))
     return API_RETURN_CODE_CORE_BUSY;
 
   seed_phrase = wo.w->get()->get_account().get_seed_phrase(seed_password);
@@ -2081,7 +2085,7 @@ void wallets_manager::on_new_block(size_t wallet_id, uint64_t /*height*/, const 
 
 }
 
-void wallets_manager::on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined)
+void wallets_manager::on_transfer2(size_t wallet_id, const tools::wallet2& wallet, const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined, bool is_wallet_in_sync_process)
 {  
   view::transfer_event_info tei = AUTO_VAL_INIT(tei);
   tei.ti = wti;
@@ -2090,7 +2094,7 @@ void wallets_manager::on_transfer2(size_t wallet_id, const tools::wallet_public:
   tei.wallet_id = wallet_id;
 
   GET_WALLET_OPTIONS_BY_ID_VOID_RET(wallet_id, w);
-  tei.is_wallet_in_sync_process = w.long_refresh_in_progress;
+  tei.is_wallet_in_sync_process = is_wallet_in_sync_process;
   if (!(w.w->get()->is_watch_only()))
   {
     m_pview->money_transfer(tei);
@@ -2121,7 +2125,7 @@ void wallets_manager::on_sync_progress(size_t wallet_id, const uint64_t& percent
   wspp.wallet_id = wallet_id;
   m_pview->wallet_sync_progress(wspp);
 }
-void wallets_manager::on_transfer_canceled(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti)
+void wallets_manager::on_transfer_canceled(size_t wallet_id, const tools::wallet2& wallet, const tools::wallet_public::wallet_transfer_info& wti)
 {
   view::transfer_event_info tei = AUTO_VAL_INIT(tei);
   tei.ti = wti;
@@ -2178,6 +2182,49 @@ bool wallets_manager::on_mw_select_wallet(uint64_t wallet_id)
   return true;
 }
 
+
+namespace
+{
+  // Same JSON-RPC method extraction as BEGIN_JSON_RPC_MAP. A substring check
+  // would miss a body the portable storage parser still accepts.
+  bool json_rpc_method(const epee::net_utils::http::http_request_info& query_info, std::string& method)
+  {
+    method.clear();
+    if (query_info.m_URI != "/json_rpc")
+      return false;
+    epee::serialization::portable_storage ps;
+    if (!ps.load_from_json(query_info.m_body))
+      return false;
+    return ps.get_value("method", method, nullptr);
+  }
+}
+
+bool wallets_manager::handle_http_request(const epee::net_utils::http::http_request_info& query_info,
+  epee::net_utils::http::http_response_info& response_info,
+  epee::net_utils::connection_context_base& conn_context,
+  bool& call_found,
+  documentation& docs)
+{
+  // mw_* are dispatched on this map, before the chain into wallet_rpc_server,
+  // so they never reached wallet_rpc_server::handle_http_request. When a JWT
+  // secret is set, require the same check here. Other methods stay on the
+  // chain and are authenticated once, there.
+  std::string method;
+  const bool mw_method = json_rpc_method(query_info, method)
+    && (method == "mw_get_wallets" || method == "mw_select_wallet");
+  if (mw_method && conn_context.m_connection_id != RPC_INTERNAL_UI_CONTEXT && m_wallet_rpc_server.jwt_auth_required())
+  {
+    if (!m_wallet_rpc_server.auth_http_request(query_info, response_info, conn_context))
+    {
+      call_found = true;
+      response_info.m_response_code = 401;
+      response_info.m_response_comment = "Unauthorized";
+      return true;
+    }
+  }
+
+  return epee::net_utils::http::i_chain_handler::handle_http_request(query_info, response_info, conn_context, call_found, docs);
+}
 
 bool wallets_manager::on_mw_get_wallets(const tools::wallet_public::COMMAND_MW_GET_WALLETS::request& req, tools::wallet_public::COMMAND_MW_GET_WALLETS::response& res, epee::json_rpc::error& er, epee::net_utils::connection_context_base& cntx)
 {
@@ -2268,6 +2315,7 @@ void wallets_manager::wallet_vs_options::worker_func()
           {
             CRITICAL_REGION_LOCAL(long_refresh_in_progress_lock);
             long_refresh_in_progress = true;
+            if (w_cb) w_cb->long_refresh_in_progress = true;
           }
 
 
@@ -2279,6 +2327,7 @@ void wallets_manager::wallet_vs_options::worker_func()
           }
           w->get()->refresh(stop_for_refresh);
           long_refresh_in_progress = false;
+          if (w_cb) w_cb->long_refresh_in_progress = false;
           w->get()->resend_unconfirmed();
           {
             auto w_ptr = *w; // get locked exclusive access to the wallet first (it's more likely that wallet is locked for a long time than 'offers')

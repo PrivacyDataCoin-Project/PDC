@@ -47,6 +47,8 @@
 #include "view_iface.h"
 #include "wallet2_base.h"
 #include "decoy_selection.h"
+#include "bare_outputs_snapshot.h"
+#include "bare_decoy_batch_planner.h"
 
 #define WALLET_DEFAULT_TX_SPENDABLE_AGE                               CURRENCY_HF4_MANDATORY_MIN_COINAGE
 #define WALLET_POS_MINT_CHECK_HEIGHT_INTERVAL                         1
@@ -373,6 +375,21 @@ namespace tools
       mutable crypto::hash tx_hash_ = currency::null_hash;
     };
 
+    private:
+      struct mix_input_plan
+      {
+        size_t            selection_pos;               // position in the input list of selected_indices
+        uint64_t          transfer_index;              // key in m_transfers
+        const transfer_details* td;
+        size_t            target_decoy_count;          // how many decoys we want
+        bool              needs_decoys;                // (!auditable && target_decoy_count > 0)
+        bool              is_real_output_post_hf4;     // zone HF real output
+        size_t            batch_idx;                   // batch index in req4/resp4 (SIZE_MAX if not needed)
+        bool              use_bare_candidates;         // daemon resolves and fills the amount pool
+      };
+
+    public:
+
     struct batch_of_bare_unspent_outs
     {
       std::vector<uint64_t> tids;
@@ -653,6 +670,13 @@ namespace tools
     //TODO: Need refactoring - remove it back to private zone 
     void set_genesis(const crypto::hash& genesis_hash);
     bool prepare_and_sign_pos_block(const mining_context& cxt, uint64_t full_block_reward, const currency::pos_entry& pe, currency::tx_generation_context& miner_tx_tgc, currency::block& b) const;
+    bool prepare_pos_zc_input_and_ring(const transfer_details& td, const currency::tx_out_zarcanum& stake_out, currency::txin_zc_input& stake_input,
+      std::vector<currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& decoy_storage, std::vector<crypto::CLSAG_GGXXG_input_ref_t>& ring, uint64_t& secret_index) const;
+    void distribute_decoys_and_build_sources(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req4,
+      const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& resp4, const std::vector<mix_input_plan>& plans,
+      bool use_all_decoys_if_found_less_than_required, std::vector<currency::tx_source_entry>& sources) const;
+    void plan_decoy_batches_for_sources(size_t fake_outputs_count_, const std::vector<uint64_t>& selected_indices, uint64_t hf4_height,
+      bool bare_candidates_enabled, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req4, std::vector<mix_input_plan>& plans);
     void process_new_blockchain_entry(const currency::block& b, 
       const currency::block_direct_data_entry& bche, 
       const crypto::hash& bl_id,
@@ -767,7 +791,7 @@ namespace tools
     //performance inefficient call, suitable only for rare ocasions or super lazy developers
     bool proxy_to_daemon(const std::string& uri, const std::string& body, int& response_code, std::string& response_body);
     void set_concise_mode(bool enabled) { m_concise_mode = enabled; }
-    // callers opt in, older daemons ignore the request flag and return full blocks
+    // compact is the default, disabling it requests legacy full block responses
     void set_compact_sync(bool enabled) { m_compact_sync = enabled; }
     bool get_compact_sync() const { return m_compact_sync; }
     void set_concise_mode_reorg_max_reorg_blocks(uint64_t max_blocks) { m_wallet_concise_mode_max_reorg_blocks = max_blocks; }
@@ -938,6 +962,9 @@ private:
     void remove_transfer_from_amount_gindex_map(uint64_t tid);
     uint64_t get_alias_cost(const std::string& alias);
     detail::split_strategy_id_t get_current_split_strategy();
+    void append_bare_decoy_candidates(currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request_batch& batch, size_t decoy_count, uint64_t real_gindex, const std::unordered_map<uint64_t, uint64_t>& bare_output_count_by_amount) const;
+    void append_heights_with_distribution(std::vector<uint64_t>& heights, size_t oversample, uint64_t preincluded_height, uint64_t min_height, decoy_selection_generator::dist_kind kind) const;
+    void build_distribution_for_input(std::vector<uint64_t>& height_distrib, uint64_t own_height, uint64_t min_height, decoy_selection_generator::dist_kind kind) const;
     void build_distribution_for_input(std::vector<uint64_t>& offsets, uint64_t own_index);
     void select_decoys(currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount & amount_entry, uint64_t own_g_index);
 

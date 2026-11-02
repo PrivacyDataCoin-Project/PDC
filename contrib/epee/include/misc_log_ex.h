@@ -142,8 +142,13 @@ DISABLE_VS_WARNINGS(4100)
 #define LOG_PRINT_CHANNEL_2_JORNAL(log_channel, log_name, x, y) {if ( (y) <= epee::log_space::log_singletone::get_log_detalisation_level() && epee::log_space::log_singletone::channel_enabled(log_channel))\
   {TRY_ENTRY();std::stringstream ss________; ss________ << epee::log_space::log_singletone::get_prefix_entry() << x << std::endl;epee::log_space::log_singletone::do_log_message(ss________.str(), y, epee::log_space::console_color_default, true, log_name);CATCH_ALL_DO_NOTHING();}}
 
+// Respect log detalisation (incl. LOG_LEVEL_SILENT / -1): previously LOG_ERROR always
+  // wrote a full callstack and ignored silent/L0 filters — a single hot path could fill GB of logs.
 #define LOG_ERROR2_CB(log_name, x, cb) { \
-  TRY_ENTRY();std::stringstream ss________; ss________ << epee::log_space::log_singletone::get_prefix_entry() << "[ERROR] Location: " << std::endl << LOCATION_SS << epee::misc_utils::get_callstack() << " Message:" << std::endl << x << std::endl; epee::log_space::log_singletone::do_log_message(ss________.str(), LOG_LEVEL_0, epee::log_space::console_color_red, true, log_name); LOCAL_ASSERT(0); epee::log_space::increase_error_count(LOG_DEFAULT_CHANNEL); cb(ss________.str()); CATCH_ALL_DO_NOTHING();}
+  epee::log_space::increase_error_count(LOG_DEFAULT_CHANNEL); \
+  if (LOG_LEVEL_0 <= epee::log_space::log_singletone::get_log_detalisation_level()) { \
+    TRY_ENTRY();std::stringstream ss________; ss________ << epee::log_space::log_singletone::get_prefix_entry() << "[ERROR] Location: " << std::endl << LOCATION_SS << epee::misc_utils::get_callstack() << " Message:" << std::endl << x << std::endl; epee::log_space::log_singletone::do_log_message(ss________.str(), LOG_LEVEL_0, epee::log_space::console_color_red, true, log_name); LOCAL_ASSERT(0); cb(ss________.str()); CATCH_ALL_DO_NOTHING(); \
+  }}
 
 #define LOG_ERROR2(log_name, x) LOG_ERROR2_CB(log_name, x, epee::log_space::log_stub)
 #define LOG_PRINT_CHANNEL2(log_channel, log_name, x, y) LOG_PRINT_CHANNEL2_CB(log_channel, log_name, x, y, epee::log_space::log_stub)
