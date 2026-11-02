@@ -6928,7 +6928,9 @@ void wallet2::append_bare_decoy_candidates(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AM
   plan_batch.input_amount = batch.input_amount;
   plan_batch.global_offsets = batch.global_offsets;
   plan_batch.ring_size = batch.ring_size;
-  std::mt19937_64 rng{crypto::rand<uint64_t>()};
+  // CSPRNG like Zano: a mt19937 seeded once is predictable; decoy sampling must
+  // not be.
+  crypto::uniform_random_bit_generator rng;
   try
   {
     bare_decoy_batch_planner::append_bare_decoy_candidates(plan_batch, decoy_count, real_gindex, bare_output_count_by_amount, max_bare_pool_size, rng);
@@ -6937,7 +6939,12 @@ void wallet2::append_bare_decoy_candidates(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AM
   {
     WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(false, e.what());
   }
+  // Planner returns only unique decoy candidates (never the real gindex). Append
+  // the real output here, separately, so the daemon's response pool contains it;
+  // plan_decoy_batches_for_sources shuffles global_offsets afterwards, so the real
+  // index does not sit at a fixed position.
   batch.global_offsets = std::move(plan_batch.global_offsets);
+  batch.global_offsets.push_back(real_gindex);
   batch.ring_size = plan_batch.ring_size;
 }
 
@@ -6946,6 +6953,9 @@ void wallet2::plan_decoy_batches_for_sources( size_t fake_outputs_count_, const 
 {
   req4.height_upper_limit = m_last_pow_block_h;
   req4.look_up_strategy = LOOK_UP_STRATEGY_REGULAR_TX;
+  // reset any leftovers from a previous attempt that may have failed over to the
+  // height-distribution path (prepare_tx_sources can call this method twice)
+  req4.batches.clear();
 
   plans.clear();
   plans.reserve(selected_indices.size());
@@ -6963,7 +6973,18 @@ void wallet2::plan_decoy_batches_for_sources( size_t fake_outputs_count_, const 
 
     const bool needs_decoys = target_outputs > 0;
     size_t batch_idx = SIZE_MAX;
-    const bool use_bare_candidates = needs_decoys && !td.is_zc() && bare_candidates_enabled;
+    // Only take the bare-candidate path when the amount has a real snapshot count
+    // large enough for the requested ring. Otherwise use the height-distribution
+    // path: an empty/undersized count map makes the daemon reduce random uint64
+    // candidates modulo the real count, which is unpredictable and can hard-throw
+    // when the pool is scanty.
+    const bool use_bare_candidates = needs_decoys && !td.is_zc() && bare_candidates_enabled
+      && bare_decoy_batch_planner::bare_candidates_viable(td.amount_for_global_output_index(), target_outputs, bare_outputs_snapshot::bare_output_count_by_amount);
+    if (needs_decoys && !td.is_zc() && bare_candidates_enabled && !use_bare_candidates)
+    {
+      WLT_LOG_L1("[BARE DECOYS] amount=" << td.amount_for_global_output_index()
+        << " has no viable bare pool in the snapshot; using the height-distribution fallback");
+    }
 
     if (needs_decoys)
     {
@@ -7295,6 +7316,39 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, bool use_all_decoys
   }
 
   distribute_decoys_and_build_sources(req4, resp4, plans, use_all_decoys_if_found_less_than_required, sources);
+
+  // A bare batch can still collapse at the daemon even when the snapshot looked
+  // viable: the pool may be scanty once ineligible/too-fresh outputs are dropped.
+  // In that case retry once through the height-distribution path instead of
+  // failing the transfer. Only do this when the caller allows using fewer decoys,
+  // to preserve the existing strict error for callers that require full decoys.
+  bool bare_batch_collapsed = false;
+  for (const mix_input_plan& plan : plans)
+  {
+    if (plan.use_bare_candidates && sources.at(plan.selection_pos).outputs.size() < plan.target_decoy_count)
+    {
+      bare_batch_collapsed = true;
+      break;
+    }
+  }
+  if (bare_batch_collapsed && use_all_decoys_if_found_less_than_required)
+  {
+    WLT_LOG_L1("[BARE DECOYS] daemon returned scanty bare candidates; retrying via the height-distribution path");
+    sources.clear();
+    req4 = AUTO_VAL_INIT(req4);
+    resp4 = AUTO_VAL_INIT(resp4);
+    plans.clear();
+    plan_decoy_batches_for_sources(fake_outputs_count_, selected_indicies, hf4_height, /*bare_candidates_enabled=*/false, req4, plans);
+    if (!req4.batches.empty())
+    {
+      bool ok = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(req4, resp4);
+      THROW_IF_FALSE_WALLET_EX(ok, error::no_connection_to_daemon, "getrandom_outs4.bin");
+      THROW_IF_FALSE_WALLET_EX(resp4.status != API_RETURN_CODE_BUSY, error::daemon_busy, "getrandom_outs4.bin");
+      THROW_IF_FALSE_WALLET_EX(resp4.status == API_RETURN_CODE_OK, error::get_random_outs_error, resp4.status);
+      WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(resp4.blocks_batches.size() == req4.batches.size(), "daemon returned mismatched blocks_batches size");
+    }
+    distribute_decoys_and_build_sources(req4, resp4, plans, use_all_decoys_if_found_less_than_required, sources);
+  }
   return true;
 }
 
