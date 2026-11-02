@@ -7325,7 +7325,9 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, bool use_all_decoys
   bool bare_batch_collapsed = false;
   for (const mix_input_plan& plan : plans)
   {
-    if (plan.use_bare_candidates && sources.at(plan.selection_pos).outputs.size() < plan.target_decoy_count)
+    // The source already contains the real output, so a full ring has
+    // target_decoy_count + 1 entries. Retry when it has at most target_decoy_count.
+    if (plan.use_bare_candidates && sources.at(plan.selection_pos).outputs.size() <= plan.target_decoy_count)
     {
       bare_batch_collapsed = true;
       break;
