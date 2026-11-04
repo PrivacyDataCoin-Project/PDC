@@ -28,7 +28,10 @@ namespace tools
   // LMDB snapshot exported on the pools seed node (vmi3493786) at height 51911.
   // IMPORTANT: zlib format (78 da header), NOT gzip (1f 8b) - the client decodes
   // with inflateInit() i.e. zlib wrapper. Packed with zlib level 9 streaming.
-  static constexpr pre_download_entry c_pre_download_lmdb = { "https://api.privacydatacoin.com/pre-download/pdc_lmdb_51911.pak", "fe38cab4deb4d287c420f34d4e495e9ea63723bdcaf443a4ece21d7991bacbf6", 382539403, 450580480 };
+  // `hash` is NOT the sha256 of the .pak file: process_predownload hashes the
+  // UNPACKED stream with crypto::stream_cn_hash (cn_fast_hash over 1 MiB blocks),
+  // so the entry below is cn_fast_hash(data.mdb), verified against the client log.
+  static constexpr pre_download_entry c_pre_download_lmdb = { "https://api.privacydatacoin.com/pre-download/pdc_lmdb_51911.pak", "9510e613801e257f4855d0c6dfc952068e50deba6ad866c6c6db88e9cc764db0", 382539403, 450580480 };
 #else
   static constexpr pre_download_entry c_pre_download_mdbx = { "", "", 0, 0 };
   static constexpr pre_download_entry c_pre_download_lmdb = { "", "", 0, 0 };
