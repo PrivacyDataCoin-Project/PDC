@@ -25,7 +25,9 @@ namespace tools
   // static constexpr pre_download_entry c_pre_download_lmdb = { "http://95.217.42.247/pre-download/zano_lmdb_95_2892700.pak", "605eb4eb0903aa7b3a2a046514ef349d45c7de31d2702fd9dc104ca65705d6eb", 7860127140, 10204872704 };
   // MDBX snapshot not refreshed (seed runs LMDB). Keep prior MDBX pre-download for mdbx clients.
   static constexpr pre_download_entry c_pre_download_mdbx = { "https://api.privacydatacoin.com/pre-download/pdc_mdbx_10818.pak", "f51821e6284ef800335a5533ce10202f54be77a6a49d206e84876c6472359294", 73643070, 268419072 };
-  static constexpr pre_download_entry c_pre_download_lmdb = { "https://api.privacydatacoin.com/pre-download/pdc_lmdb_28922.pak", "1d1c509aafa39b71e6b9eee2585914883ee8578694f131ba83ced3b8e4e84377", 212044983, 248438784 };
+  // LMDB snapshot exported on the pools seed node (vmi3493786) at height 51911:
+  // gzip -9 of blockchain_lmdb_v2/data.mdb, served by api.privacydatacoin.com/pre-download/.
+  static constexpr pre_download_entry c_pre_download_lmdb = { "https://api.privacydatacoin.com/pre-download/pdc_lmdb_51911.pak", "e0c9789d27b5b69e61badff16c220fb0e115478d21d25c1540cc3b495138b763", 379543394, 447401984 };
 #else
   static constexpr pre_download_entry c_pre_download_mdbx = { "", "", 0, 0 };
   static constexpr pre_download_entry c_pre_download_lmdb = { "", "", 0, 0 };

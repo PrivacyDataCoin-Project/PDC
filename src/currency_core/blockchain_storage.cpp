@@ -8405,7 +8405,9 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
     *p_max_related_block_height = max_related_block_height;
 
   // Height of the alt block under validation (abei not yet appended to alt_chain).
-  uint64_t alt_bl_h = split_height + alt_chain.size();
+  // Matches height_of_current_alt_block above and Zano master: +1 because the new
+  // block sits on top of split_height + alt_chain.size() existing blocks.
+  uint64_t alt_bl_h = split_height + alt_chain.size() + 1;
   if (m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, alt_bl_h))
   {
     const uint64_t coinage = (alt_bl_h > max_related_block_height)
@@ -8744,7 +8746,8 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
     }
     const transaction& tx = it == abei.onboard_transactions.end() ? *tx_ptr : it->second;
 
-    CHECK_AND_ASSERT_MES(tx.signatures.size() == tx.vin.size(), false, "invalid tx: signatures.size() == " <<  tx.signatures.size() << ", tx.vin.size() == " << tx.vin.size());
+    CHECK_AND_ASSERT_MES(tx.signatures.size() == tx.vin.size(), false, "invalid alt block tx " << tx_id << ": signatures.size() == " <<  tx.signatures.size() << ", tx.vin.size() == " << tx.vin.size());
+    CHECK_AND_ASSERT_MES(validate_tx_semantic(tx, get_object_blobsize(tx)), false, "invalid alt block tx " << tx_id << ": semantic validation failed");
 
     fees.push_back(get_tx_fee(tx));
 
