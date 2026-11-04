@@ -116,7 +116,15 @@ namespace net_utils
 
         int flag = Z_NO_FLUSH;
         int ret = inflate(&m_zstream_in, flag);
-        CHECK_AND_ASSERT_MES(ret>=0 || m_zstream_in.avail_out ||m_is_deflate_mode, false, "content_encoding_gzip::update_in() Failed to inflate. ret = " << ret << ", msg: " << (m_zstream_in.msg ? m_zstream_in.msg : ""));
+        // Never assert on inflate errors: a truncated/corrupt HTTP body (e.g. while
+        // downloading the pre-download .pak) must abort the transfer cleanly, not
+        // crash the daemon. Z_BUF_ERROR/Z_MEM_ERROR/Z_DATA_ERROR all mean "bad stream".
+        if (ret < 0 && !m_zstream_in.avail_out && !m_is_deflate_mode)
+        {
+          LOG_ERROR("content_encoding_gzip::update_in() Failed to inflate. ret = " << ret << ", msg: " << (m_zstream_in.msg ? m_zstream_in.msg : ""));
+          m_pre_decode.swap(piece_of_transfer);
+          return false;
+        }
 
         if(Z_STREAM_END == ret)
           m_is_stream_ended = true;
@@ -153,7 +161,16 @@ namespace net_utils
         }
         else
         {
-          CHECK_AND_ASSERT_MES(Z_DATA_ERROR != ret, false, "content_encoding_gzip::update_in() Failed to inflate. err = Z_DATA_ERROR");
+          // A truncated/corrupt stream mid-download (e.g. flaky connection while
+          // fetching the pre-download .pak) makes inflate() return Z_DATA_ERROR.
+          // Do NOT assert here: return false so the caller aborts the download
+          // cleanly and retries instead of crashing the daemon.
+          if (Z_DATA_ERROR == ret)
+          {
+            LOG_ERROR("content_encoding_gzip::update_in() Failed to inflate. err = Z_DATA_ERROR (truncated or corrupt gzip stream), avail_in=" << m_zstream_in.avail_in);
+            m_pre_decode.swap(piece_of_transfer);
+            return false;
+          }
         }
 
 
