@@ -7650,23 +7650,29 @@ void wallet2::add_sent_tx_detailed_info(const transaction& tx, const std::vector
   const std::vector<currency::tx_destination_entry>& destinations,
   const std::vector<uint64_t>& selected_transfers)
 {
-  payment_id_t payment_id;
-  get_payment_id_from_decrypted_container(decrypted_att, payment_id);
+  payment_id_t tx_wide_payment_id;
+  get_payment_id_from_decrypted_container(decrypted_att, tx_wide_payment_id);
 
   std::vector<std::string> recipients;
-  std::unordered_set<account_public_address> used_addresses;
+  std::unordered_set<std::string> used_addresses; // string form: an integrated address encodes its own payment id
   for (const auto& d : destinations)
   {
     for (const auto& addr : d.addr)
     {
-      if (used_addresses.insert(addr).second && addr != m_account.get_public_address())
-        recipients.push_back(payment_id.empty() ? get_account_address_as_str(addr) : get_account_address_and_payment_id_as_str(addr, payment_id));
+      // backport of zano da88b8a1 (intrinsic payment id part): per-destination id, tx-wide only as legacy fallback.
+      // PDC has no intrinsic (uint64) payment id in tx_destination_entry, so only the tx-wide id applies here.
+      payment_id_t payment_id = tx_wide_payment_id;
+      if (addr == m_account.get_public_address())
+        continue; // skip self (sending to self with payment id is prohibited anyway)
+      std::string address_str = payment_id.empty() ? get_account_address_as_str(addr) : get_account_address_and_payment_id_as_str(addr, payment_id);
+      if (used_addresses.insert(address_str).second)
+        recipients.push_back(address_str);
     }
   }
   if (!recipients.size())
   {
-    //transaction send to ourself
-    recipients.push_back(payment_id.empty() ? get_account_address_as_str(m_account.get_public_address()) : get_account_address_and_payment_id_as_str(m_account.get_public_address(), payment_id));
+    // sending funds to self
+    recipients.push_back(get_account_address_as_str(m_account.get_public_address()));
   }
 
   add_sent_unconfirmed_tx(tx, recipients, selected_transfers, destinations);
