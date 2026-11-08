@@ -23,15 +23,17 @@ namespace tools
 #ifndef TESTNET
   // static constexpr pre_download_entry c_pre_download_mdbx = { "http://95.217.42.247/pre-download/zano_mdbx_95_2892700.pak", "68e819cd119e4af1b81f1852e42978d662f1e6355124352f3e835db32b5a8230", 6414724487, 10468823040 };
   // static constexpr pre_download_entry c_pre_download_lmdb = { "http://95.217.42.247/pre-download/zano_lmdb_95_2892700.pak", "605eb4eb0903aa7b3a2a046514ef349d45c7de31d2702fd9dc104ca65705d6eb", 7860127140, 10204872704 };
-  // MDBX snapshot not refreshed (seed runs LMDB). Keep prior MDBX pre-download for mdbx clients.
-  static constexpr pre_download_entry c_pre_download_mdbx = { "https://api.privacydatacoin.com/pre-download/pdc_mdbx_10818.pak", "f51821e6284ef800335a5533ce10202f54be77a6a49d206e84876c6472359294", 73643070, 268419072 };
-  // LMDB snapshot exported on the pools seed node (vmi3493786) at height 51911.
+  // MDBX snapshot exported from a fully synced local mdbx node at height 57698.
+  // Same packing rules as LMDB entry: zlib wrapper (78 da), `hash` is
+  // cn_fast_hash of the UNPACKED mdbx.dat (see c_pre_download_lmdb comment).
+  static constexpr pre_download_entry c_pre_download_mdbx = { "https://api.privacydatacoin.com/pre-download/pdc_mdbx_57698.pak", "d05bdb84f6eb8969b4fe8aba565fe970ecb3fd3079cba416a656990ade269599", 370273355, 536838144 };
+  // LMDB snapshot exported on the pools seed node (vmi3493786) at height 57624.
   // IMPORTANT: zlib format (78 da header), NOT gzip (1f 8b) - the client decodes
   // with inflateInit() i.e. zlib wrapper. Packed with zlib level 9 streaming.
   // `hash` is NOT the sha256 of the .pak file: process_predownload hashes the
   // UNPACKED stream with crypto::stream_cn_hash (cn_fast_hash over 1 MiB blocks),
-  // so the entry below is cn_fast_hash(data.mdb), verified against the client log.
-  static constexpr pre_download_entry c_pre_download_lmdb = { "https://api.privacydatacoin.com/pre-download/pdc_lmdb_51911.pak", "9510e613801e257f4855d0c6dfc952068e50deba6ad866c6c6db88e9cc764db0", 382539403, 450580480 };
+  // so the entry below is cn_fast_hash(data.mdb), computed with the repo's own libcrypto.
+  static constexpr pre_download_entry c_pre_download_lmdb = { "https://api.privacydatacoin.com/pre-download/pdc_lmdb_57624.pak", "9d81f91d5ab9953ec2aba4262d76a560242a6f081dc5f20aa60117c0c8e2f3af", 426561554, 502165504 };
 #else
   static constexpr pre_download_entry c_pre_download_mdbx = { "", "", 0, 0 };
   static constexpr pre_download_entry c_pre_download_lmdb = { "", "", 0, 0 };
@@ -103,7 +105,7 @@ namespace tools
       };
 
       tools::create_directories_if_necessary(working_folder);
-      r = cl.download_and_unzip(cb, downloading_file_path, url, 5000 /* timout */, "GET", std::string(), 30 /* fails count */);
+      r = cl.download_and_unzip(cb, downloading_file_path, url, 5000 /* timout */, "GET", std::string(), 5 /* fails count */);
       if (!r)
       {
         LOG_PRINT_RED("Downloading failed", LOG_LEVEL_0);

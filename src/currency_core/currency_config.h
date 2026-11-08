@@ -294,7 +294,7 @@ static_assert(CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX != CURRENCY_PUBLIC_INT
 #define ZANO_HARDFORK_07_MIN_BUILD_VER                  4
 // HF8: force upgraded nodes before PoS strict sequence limit (h>57000).
 #define ZANO_HARDFORK_08_AFTER_HEIGHT                   50000
-#define ZANO_HARDFORK_08_MIN_BUILD_VER                  11
+#define ZANO_HARDFORK_08_MIN_BUILD_VER                  15
 #else
 // Testnet
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   0
