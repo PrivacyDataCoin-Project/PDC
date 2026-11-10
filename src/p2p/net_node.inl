@@ -317,6 +317,8 @@ namespace nodetool
   {
 #ifndef TESTNET
     ADD_HARDCODED_SEED_NODE("169.58.142.131", P2P_DEFAULT_PORT);
+    // secondary entry point on the same host, alt port (in case 19121 is filtered)
+    ADD_HARDCODED_SEED_NODE("169.58.142.131", 18121);
 #else
     ADD_HARDCODED_SEED_NODE("169.58.142.131", P2P_DEFAULT_PORT);
 #endif
