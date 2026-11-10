@@ -14,7 +14,7 @@ message("OPENSSL_SSL_LIBRARY: ${OPENSSL_SSL_LIBRARY}")
 
 
 
-set(VERSION "3.3.1")
+set(VERSION "3.3.2")
 
 if(POLICY CMP0043)
   cmake_policy(SET CMP0043 NEW)
